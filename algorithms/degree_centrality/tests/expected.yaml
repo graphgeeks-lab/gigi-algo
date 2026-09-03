@@ -1,0 +1,102 @@
+# Known answers for degree centrality. Each `derived` says where the expected
+# value came from -- never from running the code. See the pagerank file for why.
+
+cases:
+  - id: tiny_directed_by_hand
+    description: The tiny-directed fixture, counted by hand.
+    derived: >
+      Hand count. Edges a->b, b->c, c->a, a->c. Incidences: a has 2 out + 1 in
+      = 3, b has 1 + 1 = 2, c has 1 out + 2 in = 3. Divide by n - 1 = 2.
+    dataset: tiny-directed
+    parameters: {normalized: true, mode: all}
+    expected: {a: 1.5, b: 1.0, c: 1.5}
+
+  - id: tiny_directed_unnormalised
+    description: Same fixture, raw counts.
+    derived: The hand count above, without the division.
+    dataset: tiny-directed
+    parameters: {normalized: false, mode: all}
+    expected: {a: 3.0, b: 2.0, c: 3.0}
+
+  - id: undirected_triangle_is_uniform
+    derived: Symmetry; every node in a triangle has degree 2, and n - 1 = 2.
+    graph:
+      directed: false
+      edges: [[a, b], [b, c], [c, a]]
+    parameters: {normalized: true}
+    expected: {a: 1.0, b: 1.0, c: 1.0}
+
+  - id: undirected_star
+    description: A hub with three leaves.
+    derived: >
+      Definition. The hub touches all n - 1 = 3 other nodes, so scores 1; each
+      leaf touches one, so scores 1/3.
+    graph:
+      directed: false
+      edges: [[hub, x], [hub, y], [hub, z]]
+    parameters: {normalized: true}
+    expected: {hub: 1.0, x: 0.3333333333333333, y: 0.3333333333333333, z: 0.3333333333333333}
+
+  - id: directed_path_in_degree
+    description: a -> b -> c, counting arrivals only.
+    derived: Hand count. Nothing arrives at a; one edge arrives at each of b and c. n - 1 = 2.
+    graph:
+      directed: true
+      edges: [[a, b], [b, c]]
+    parameters: {normalized: true, mode: in}
+    expected: {a: 0.0, b: 0.5, c: 0.5}
+
+  - id: directed_path_out_degree
+    description: a -> b -> c, counting departures only.
+    derived: Hand count. One edge leaves each of a and b; nothing leaves c.
+    graph:
+      directed: true
+      edges: [[a, b], [b, c]]
+    parameters: {normalized: true, mode: out}
+    expected: {a: 0.5, b: 0.5, c: 0.0}
+
+  - id: self_loop_counts_twice
+    description: A directed self loop is both an out-edge and an in-edge.
+    derived: >
+      Definition, as stated in maths.under_determined.self_loop_counting. With
+      edges a->a and a->b: a has 2 out + 1 in = 3, b has 1. n - 1 = 1.
+    graph:
+      directed: true
+      edges: [[a, a], [a, b]]
+    parameters: {normalized: true, mode: all}
+    expected: {a: 3.0, b: 1.0}
+
+  - id: parallel_edges_count_twice
+    derived: Definition. Degree counts incidences, so a->b twice gives a and b each 2. n - 1 = 1.
+    graph:
+      directed: true
+      edges: [[a, b], [a, b]]
+    parameters: {normalized: true, mode: all}
+    expected: {a: 2.0, b: 2.0}
+
+  - id: isolated_node_scores_zero
+    derived: Definition; no incidences, so degree 0 whatever the normalisation.
+    graph:
+      directed: true
+      edges: [[a, b]]
+      nodes: [a, b, alone]
+    parameters: {normalized: true, mode: all}
+    expected: {a: 0.5, b: 0.5, alone: 0.0}
+
+  - id: single_node_is_zero_by_convention
+    description: One node, no edges.
+    derived: >
+      Convention, recorded in maths.under_determined.singleton_normalisation.
+      With n = 1 the normaliser n - 1 is zero, so the definition does not
+      apply; this reference returns the raw degree, which is 0. NetworkX
+      returns 1 by its own convention and rustworkx returns NaN -- both are
+      declared divergences.
+    dataset: single-node
+    parameters: {normalized: true, mode: all}
+    expected: {only: 0.0}
+
+  - id: empty_graph_is_empty
+    derived: Definition; no nodes, so nothing to score.
+    dataset: empty
+    parameters: {}
+    expected: {}

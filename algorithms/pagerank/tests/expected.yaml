@@ -1,0 +1,92 @@
+# Known answers: the reference implementation's only independent check.
+#
+# Every engine is compared against reference.py, so if reference.py is wrong,
+# every green check is meaningless. These cases guard against that. Each one
+# says in `derived` where its expected answer came from -- symmetry, a closed
+# form, a hand calculation -- and never "I ran the code". A case derived by
+# running the code proves nothing; a case derived from the definition proves
+# the reference implements the definition.
+#
+# The conformance suite runs every case against the reference, and against
+# every installed engine (excusing declared divergences). Write YAML, not pytest.
+
+cases:
+  - id: four_cycle_is_uniform
+    description: Every node in a directed 4-cycle is interchangeable.
+    derived: >
+      Symmetry. The graph has a rotational automorphism mapping any node to
+      any other, so all four scores are equal, and they sum to one.
+    graph:
+      directed: true
+      edges: [[a, b], [b, c], [c, d], [d, a]]
+    parameters: {damping: 0.85, weight_property: false}
+    expected: {a: 0.25, b: 0.25, c: 0.25, d: 0.25}
+
+  - id: two_cycle_is_half_half
+    description: a <-> b.
+    derived: Symmetry, as above, with two nodes.
+    graph:
+      directed: true
+      edges: [[a, b], [b, a]]
+    parameters: {damping: 0.85, weight_property: false}
+    expected: {a: 0.5, b: 0.5}
+
+  - id: single_edge_into_a_sink
+    description: a -> b, where b has no outgoing edges.
+    derived: >
+      Closed form. With N = 2, d = 0.85 and b dangling, the fixed point is
+      r(a) = (1-d)/2 + d*r(b)/2 and r(a) + r(b) = 1, giving
+      r(a) = 0.5 / 1.425 = 20/57 and r(b) = 37/57.
+    graph:
+      directed: true
+      edges: [[a, b]]
+    parameters: {damping: 0.85, weight_property: false}
+    expected: {a: 0.35087719298245615, b: 0.6491228070175439}
+    tolerance: 1.0e-9
+
+  - id: two_leaves_into_a_hub
+    description: b -> a, c -> a; a is a sink.
+    derived: >
+      Closed form. By symmetry r(b) = r(c) = x and r(a) = y with 2x + y = 1.
+      The leaves receive only teleport plus their share of a's dangling mass:
+      x = (1-d)/3 + d*y/3. Substituting y = 1 - 2x and d = 0.85 gives
+      x = 10/47 and y = 27/47.
+    graph:
+      directed: true
+      edges: [[b, a], [c, a]]
+    parameters: {damping: 0.85, weight_property: false}
+    expected: {a: 0.574468085106383, b: 0.2127659574468085, c: 0.2127659574468085}
+    tolerance: 1.0e-9
+
+  - id: undirected_edge_is_half_half
+    description: One undirected edge a -- b.
+    derived: Symmetry; the two endpoints of a single undirected edge are interchangeable.
+    graph:
+      directed: false
+      edges: [[a, b]]
+    parameters: {damping: 0.85, weight_property: false}
+    expected: {a: 0.5, b: 0.5}
+
+  - id: single_node_holds_everything
+    description: One node and no edges.
+    derived: >
+      Definition. With N = 1 the teleport term is (1-d)/1 and the single node
+      is dangling, so its mass returns to itself; the only distribution over
+      one node is 1.
+    dataset: single-node
+    parameters: {damping: 0.85, weight_property: false}
+    expected: {only: 1.0}
+
+  - id: weights_shift_mass_toward_the_heavy_edge
+    description: a -> b with weight 1 and a -> c with weight 3; b and c point back to a.
+    derived: >
+      Closed form. No node is dangling. b and c return all their mass to a, so
+      r(a) = (1-d)/3 + d*(1 - r(a)), giving r(a) = 0.9/1.85 = 18/37. a's mass
+      splits 1:3 by weight, so r(b) = 1/20 + d*r(a)/4 = 227/1480 and
+      r(c) = 1/20 + 3*d*r(a)/4 = 533/1480. Check: 720 + 227 + 533 = 1480.
+    graph:
+      directed: true
+      edges: [[a, b, 1.0], [a, c, 3.0], [b, a, 1.0], [c, a, 1.0]]
+    parameters: {damping: 0.85, weight_property: weight}
+    expected: {a: 0.4864864864864865, b: 0.15337837837837838, c: 0.36013513513513513}
+    tolerance: 1.0e-9

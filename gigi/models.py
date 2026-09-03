@@ -349,11 +349,42 @@ class ChoicePoint(BaseModel):
     question: str
     choices: list[str] = Field(default_factory=list)
     note: str | None = None
-    # The divergence this choice turned out to cause, if any, and the fixtures
+    # The divergences this choice turned out to cause, if any, and the fixtures
     # that settle which answer the engines chose. A choice point with neither
     # is one nothing has tested yet -- which `gigi review` reports as a gap.
-    divergence: str | None = None
+    divergences: list[str] = Field(default_factory=list)
     datasets: list[str] = Field(default_factory=list)
+
+
+class InlineGraph(BaseModel):
+    """A graph small enough to write in a test case by hand.
+
+    `edges` are `[source, target]` or `[source, target, weight]`. `nodes` is
+    only needed for nodes with no edges.
+    """
+
+    directed: bool = True
+    edges: list[list[Any]] = Field(default_factory=list)
+    nodes: list[str] = Field(default_factory=list)
+
+
+class KnownAnswer(BaseModel):
+    """One case in `algorithms/<id>/tests/expected.yaml`.
+
+    The point is `derived`: it says where the expected answer came from, and
+    it must not be "I ran the code". A known answer obtained by symmetry, a
+    closed form, a hand calculation or a paper is an independent check on the
+    reference implementation -- the only one the oracle gets.
+    """
+
+    id: str
+    description: str = ""
+    derived: str
+    dataset: str | None = None
+    graph: InlineGraph | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    expected: dict[str, float]
+    tolerance: float = 1e-9
 
 
 class Maths(BaseModel):

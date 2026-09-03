@@ -62,8 +62,15 @@ def test_invariants_hold_on_every_engine(algorithm_id):
             assert result.invariants, (
                 f"{result.engine} on {dataset_id}: no invariants were checked"
             )
+            excused = any(
+                d.detect and dataset_id in d.detect.datasets and result.engine in d.detect.engines
+                for d in spec.divergences
+            )
             failures = [f"{i.invariant_id}: {i.detail}" for i in result.failed_invariants]
-            assert not failures, f"{result.engine} on {dataset_id}: {failures}"
+            assert not failures or excused, (
+                f"{result.engine} on {dataset_id}: {failures} -- and no declared "
+                f"divergence accounts for it"
+            )
 
 
 @pytest.mark.parametrize("algorithm_id", ALGORITHMS)
@@ -79,9 +86,9 @@ def test_choice_points_resolve(algorithm_id):
 
     for choice in spec.maths.under_determined:
         assert choice.question.strip(), f"{choice.id}: no question"
-        if choice.divergence:
-            assert choice.divergence in declared, (
-                f"{choice.id} points at divergence {choice.divergence!r}, "
+        for divergence_id in choice.divergences:
+            assert divergence_id in declared, (
+                f"{choice.id} points at divergence {divergence_id!r}, "
                 f"which this algorithm does not declare"
             )
         for dataset_id in choice.datasets:
@@ -97,7 +104,7 @@ def test_every_declared_divergence_has_a_choice_point(algorithm_id):
     spec = registry.load_algorithm(algorithm_id)
     if spec.maturity.value != "stable":
         return
-    covered = {c.divergence for c in spec.maths.under_determined if c.divergence}
+    covered = {d for c in spec.maths.under_determined for d in c.divergences}
     for divergence in spec.divergences:
         assert divergence.id in covered, (
             f"{algorithm_id}: divergence {divergence.id!r} has no matching entry "

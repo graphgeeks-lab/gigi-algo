@@ -72,15 +72,30 @@ def review_command(algorithm: str) -> None:
     result = review(algorithm)
     spec = registry.load_algorithm(algorithm)
 
-    console.print(f"[bold]Reviewing {spec.name}[/bold]  ({algorithm})")
+    console.print(
+        f"[bold]Reviewing {spec.name}[/bold]  ({algorithm}, claims [bold]{result.maturity}[/bold])"
+    )
     console.print()
 
-    console.print("[bold]Settled by machine[/bold] -- you do not need to check these")
+    console.print(
+        f"[bold]Settled by machine[/bold] -- the requirements of `{result.maturity}`, "
+        "plus what happened when it ran"
+    )
     table = Table("check", "", "detail")
     for check in result.checks:
         mark = "[green]pass[/green]" if check.passed else "[red]FAIL[/red]"
         table.add_row(check.name, mark, check.detail)
     console.print(table)
+
+    target, lacking = result.promotion
+    if target:
+        console.print()
+        if lacking:
+            console.print(f"[bold]To reach `{target}`[/bold] -- what promotion would take")
+            for item in lacking:
+                console.print(f"  [yellow]-[/yellow] {item}")
+        else:
+            console.print(f"[green]Meets every requirement of `{target}`[/green] -- ready to promote")
 
     if result.gaps:
         console.print()
@@ -136,8 +151,8 @@ def maths(algorithm: str) -> None:
             console.print(f"  [bold]{choice.question}[/bold]")
             for option in choice.choices:
                 console.print(f"    - {option}")
-            if choice.divergence:
-                console.print(f"    [red]engines differ:[/red] {choice.divergence}")
+            if choice.divergences:
+                console.print(f"    [red]engines differ:[/red] {', '.join(choice.divergences)}")
             elif choice.datasets:
                 console.print(
                     f"    [green]engines agree[/green] on {', '.join(choice.datasets)}"

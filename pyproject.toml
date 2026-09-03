@@ -18,6 +18,8 @@ dependencies = [
 networkx = ["networkx>=3.0", "scipy>=1.10"]
 igraph = ["python-igraph>=0.11"]
 rustworkx = ["rustworkx>=0.14"]
+# PDF export of algorithm entries. The .typ source never needs this.
+docs = ["typst>=0.13"]
 all = ["networkx>=3.0", "scipy>=1.10", "python-igraph>=0.11", "rustworkx>=0.14"]
 dev = [
     "pytest>=8.0",
@@ -25,6 +27,7 @@ dev = [
     "scipy>=1.10",
     "python-igraph>=0.11",
     "rustworkx>=0.14",
+    "typst>=0.13",
 ]
 
 [project.scripts]

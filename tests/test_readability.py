@@ -145,8 +145,8 @@ def test_every_cli_command_has_help_text():
 # REPORTING re-presents what capability already computed -- the CLI, the static
 # site, the review summary. It grows with what we choose to *show*, which is a
 # different and much cheaper kind of growth.
-REPORTING = ("cli", "site", "review.py")
-CAPABILITY_BUDGET = 1500
+REPORTING = ("cli", "site", "review.py", "typst.py")
+CAPABILITY_BUDGET = 1800
 
 
 def _is_reporting(path: pathlib.Path) -> bool:

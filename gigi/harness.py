@@ -227,12 +227,26 @@ def verify(
         report.comparisons.extend(comparisons)
 
         for broken in (r for r in runs if r.failed_invariants):
-            report.status = "fail"
             first = broken.failed_invariants[0]
-            report.conclusion = (
-                f"{broken.engine} violated {first.invariant_id} on {dataset_id}: "
-                f"{first.detail}"
+            known = _explaining_divergence(spec, dataset_id, broken.engine)
+            difference = Difference(
+                dataset_id=dataset_id,
+                engine_a="reference",
+                engine_b=broken.engine,
+                divergence_id=known,
+                detail=f"violated {first.invariant_id}: {first.detail}",
             )
+            if known:
+                # The registry already says this engine misbehaves here -- an
+                # invariant failure is one more way of seeing the same thing.
+                report.explained_differences.append(difference)
+            else:
+                report.status = "fail"
+                report.undeclared_differences.append(difference)
+                report.conclusion = (
+                    f"{broken.engine} violated {first.invariant_id} on {dataset_id}: "
+                    f"{first.detail}"
+                )
 
         for failed in (r for r in runs if r.status == RunStatus.error):
             known = _explaining_divergence(spec, dataset_id, failed.engine)

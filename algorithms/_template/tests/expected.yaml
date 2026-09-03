@@ -1,0 +1,35 @@
+# Known answers: the one test file you write by hand -- in YAML, not pytest.
+#
+# Everything else about your algorithm is tested automatically, but every one
+# of those tests compares engines against your reference implementation. If the
+# reference is wrong, they all pass anyway. These cases are the guard: expected
+# values that come from the DEFINITION, not from running the code.
+#
+# `derived` is required and must say where the number came from: symmetry, a
+# closed form, a hand count, a worked example in a paper. "I ran it and this is
+# what came out" is exactly what this file exists to rule out.
+#
+# `emerging` needs two cases; `stable` needs four. Include a degenerate one.
+
+cases:
+  - id: undirected_triangle_is_uniform
+    derived: Symmetry; every node in a triangle has degree 2, and n - 1 = 2.
+    graph:
+      directed: false
+      edges: [[a, b], [b, c], [c, a]]
+    parameters: {normalized: true}
+    expected: {a: 1.0, b: 1.0, c: 1.0}
+
+  - id: tiny_directed_by_hand
+    derived: >
+      Hand count on the tiny-directed fixture. Edges a->b, b->c, c->a, a->c:
+      a has 3 incidences, b has 2, c has 3. Divide by n - 1 = 2.
+    dataset: tiny-directed
+    parameters: {normalized: true}
+    expected: {a: 1.5, b: 1.0, c: 1.5}
+
+  - id: empty_graph_is_empty
+    derived: Definition; no nodes, nothing to score.
+    dataset: empty
+    parameters: {}
+    expected: {}

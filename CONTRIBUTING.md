@@ -193,17 +193,61 @@ divergences:
 "All four engines redistribute dangling mass uniformly, checked to 1e-13" is
 information somebody currently has to rediscover by hand.
 
-**6. Run the suite.**
+**6. Write `tests/expected.yaml` -- the one test file you write, in YAML.**
+
+Every other test compares engines against your reference implementation. If the
+reference is wrong, they all pass anyway. Known answers are the guard:
+
+```yaml
+cases:
+  - id: undirected_triangle_is_uniform
+    derived: Symmetry; every node in a triangle has degree 2, and n - 1 = 2.
+    graph:
+      directed: false
+      edges: [[a, b], [b, c], [c, a]]
+    parameters: {normalized: true}
+    expected: {a: 1.0, b: 1.0, c: 1.0}
+```
+
+`derived` is required and is the point: it says where the number came from --
+symmetry, a closed form, a hand count, a worked example in a paper. Never "I ran
+the code". A case derived by running the code checks the code against itself.
+Name a `dataset:` instead of an inline `graph:` when you want the case to run on
+every engine too. `emerging` needs two cases; `stable` needs four.
+
+**7. Run the suite.**
 
 ```bash
 pytest
 ```
 
 Every test that applies to your algorithm was generated from the files you just
-wrote. You should not need to add any — the exception is a handwritten test for
-the reference implementation against closed-form answers, the way
-`tests/test_pagerank_reference.py` does, because only mathematics can prove the
-oracle right.
+wrote. You add none.
+
+## What each maturity requires
+
+One price list, in `gigi/requirements.py`. `gigi review <algorithm>` shows
+which requirements you meet and exactly what the next tier would take; the test
+suite refuses an entry that claims a tier it has not earned.
+
+| tier | owes |
+|---|---|
+| `frontier` | a reference implementation; family and people resolve |
+| `emerging` | the maths is stated; one invariant asserted on every run; two known answers, each with a real `derived`; divergences credited; `notes.md` says what was measured |
+| `stable` | every divergence has a `detect` block and a matching choice point in `maths.under_determined`; four known answers; original authors and work cited; runs on `empty` and `single-node`; two engines besides the reference |
+
+Start at `emerging`. Promotion is a human decision, but `gigi review` tells you
+when nothing stands in its way.
+
+## Typeset it
+
+```bash
+gigi typst <algorithm>          # writes site/typst/<algorithm>.typ
+gigi typst <algorithm> --pdf    # needs: pip install 'gigi-algo[docs]'
+```
+
+A printable, citable version of the entry -- maths rendered from the same LaTeX
+the spec stores, with the verification evidence attached.
 
 ## Adding a dataset
 

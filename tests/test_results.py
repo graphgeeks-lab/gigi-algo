@@ -68,3 +68,20 @@ def test_top_node_metric_is_reported():
         _scores(a=0.9, b=0.1), _scores(a=0.1, b=0.9), 1e-6, 1e-5
     )
     assert metrics["top_node_agrees"] == 0.0
+
+
+def test_nan_is_never_equivalent():
+    """abs(x - nan) is nan, and nan > tolerance is False -- so without an explicit
+    guard a NaN result passes every comparison. It did, once."""
+    equivalent, metrics, notes = compare_node_scores(
+        _scores(a=0.0), _scores(a=float("nan")), 1e-6, 1e-5
+    )
+    assert not equivalent
+    assert any("non-finite" in n for n in notes)
+
+
+def test_infinity_is_never_equivalent():
+    equivalent, _, _ = compare_node_scores(
+        _scores(a=1.0), _scores(a=float("inf")), 1e-6, 1e-5
+    )
+    assert not equivalent

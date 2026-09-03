@@ -40,6 +40,7 @@ gigi families                                      # the taxonomy, as questions
 gigi people                                        # who has contributed, and to what
 gigi export -o registry.json                       # the whole registry, for machines
 gigi review pagerank                               # what to check before merging
+gigi typst pagerank --pdf                          # a printable, citable PDF of the entry
 gigi engines                                       # what is installed here
 gigi inspect datasets/weighted-small               # cheap structural facts
 gigi compare pagerank -g weighted-small --defaults # reproduce the table above
@@ -98,10 +99,11 @@ surprise.
 |---|---|
 | Algorithms | `pagerank`, `degree_centrality` |
 | Engines | `reference`, `networkx`, `igraph`, `rustworkx` |
-| Fixtures | 7 small adversarial graphs |
-| Divergences | 3, all reproduced by CI |
+| Fixtures | 9 small adversarial graphs, including `empty` and `single-node` |
+| Divergences | 5, all reproduced by CI |
 | Output kinds | `node_score` |
 | Invariants | 7, checked on every engine and fixture |
+| Known answers | 18 hand-derived cases the reference must reproduce |
 | Families | 16, covering the roadmap |
 | Attribution | three layers: origin, Gigi credits, divergence discovery |
 
@@ -181,8 +183,13 @@ By eye -- nothing checks these but you
 
 That first by-eye item is the one that matters: the reference implementation is
 the oracle every engine is compared against, so if it is wrong, every green
-check above it is meaningless. Nothing automated can check it, which is why the
-command prints the definition underneath.
+check above it is meaningless. `tests/expected.yaml` is the partial defence --
+known answers derived by hand, from the definition, which the reference must
+reproduce -- and the command prints the definition so you can check the rest.
+
+Maturity is priced. `gigi/requirements.py` says what `frontier`, `emerging` and
+`stable` each owe, `gigi review` shows exactly what promotion would take, and the
+test suite refuses an entry claiming a tier it has not earned.
 
 Readability is itself a checked property. `tests/test_readability.py` enforces
 no module over 400 code lines, a docstring on every module and every non-obvious

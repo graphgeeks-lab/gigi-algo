@@ -162,7 +162,7 @@ maths:
         - ignore weights unless explicitly asked (igraph, rustworkx)
         - use an attribute called "weight" if one exists (networkx)
         - require the caller to name the column
-      divergence: networkx-weight-default
+      divergences: [networkx-weight-default]
       datasets: [weighted-small]
 
     - id: convergence_criterion
@@ -180,7 +180,7 @@ maths:
       choices:
         - treat each edge as two arcs
         - refuse to run
-      divergence: rustworkx-directed-only
+      divergences: [rustworkx-directed-only]
       datasets: [undirected-small]
 
 requirements:
@@ -255,6 +255,8 @@ engines:
     notes: Power iteration; weights only via an explicit weight_fn.
 
 datasets:
+  - empty
+  - single-node
   - tiny-directed
   - dangling-small
   - disconnected-small

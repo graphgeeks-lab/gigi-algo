@@ -29,6 +29,8 @@ All three should work immediately. Now replace the example, one piece at a time:
 6. **`maths.md`** — the definition, and the places the definition leaves a
    choice open. Those are where engines diverge.
 7. **`notes.md`** — what you measured, after running `gigi verify`.
+8. **`tests/expected.yaml`** — known answers derived from the definition, never
+   from running the code. The template ships three; `emerging` needs two.
 
 When engines disagree, work out why, then record it as a `divergence` with a
 `detect` block so CI reproduces the claim. When they agree, say so in

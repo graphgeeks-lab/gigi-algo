@@ -18,7 +18,7 @@ import pyarrow.csv as pa_csv
 import pyarrow.parquet as pa_parquet
 import yaml
 
-from gigi.models import GraphMetadata, GraphProfile
+from gigi.models import EdgeColumns, GraphMetadata, GraphProfile
 from gigi.paths import datasets_dir
 
 # Node identifiers are canonicalised to strings. Engines disagree about integer
@@ -144,6 +144,40 @@ def _check_expected_counts(directory: Path, graph: GraphData) -> None:
             f"{directory}: graph.yaml expects {expected['nodes']} nodes, "
             f"found {len(graph.node_ids)}"
         )
+
+
+def graph_from_edges(
+    graph_id: str,
+    edges: list[list],
+    directed: bool = True,
+    nodes: list[str] | None = None,
+) -> GraphData:
+    """Build a GraphData in memory from `[source, target]` or
+    `[source, target, weight]` rows. For test cases small enough to write by
+    hand; anything larger belongs in `datasets/` where it can be reviewed."""
+    weighted = any(len(row) > 2 for row in edges)
+    columns: dict[str, list] = {
+        "source": [str(row[0]) for row in edges],
+        "target": [str(row[1]) for row in edges],
+    }
+    if weighted:
+        columns["weight"] = [float(row[2]) if len(row) > 2 else 1.0 for row in edges]
+
+    schema = pa.schema(
+        [("source", pa.string()), ("target", pa.string())]
+        + ([("weight", pa.float64())] if weighted else [])
+    )
+    metadata = GraphMetadata(
+        id=graph_id,
+        directed=directed,
+        edges=EdgeColumns(weight="weight" if weighted else None),
+    )
+    node_table = (
+        pa.table({"id": [str(n) for n in nodes]}, schema=pa.schema([("id", pa.string())]))
+        if nodes is not None
+        else None
+    )
+    return GraphData(edges=pa.table(columns, schema=schema), metadata=metadata, nodes=node_table)
 
 
 def list_datasets() -> list[str]:

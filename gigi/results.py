@@ -12,6 +12,7 @@ paths arrive in v0.2 alongside the algorithms that need them.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Sequence
 
 from gigi.models import AlgorithmSpec, Comparison, NodeScoreResult
@@ -89,6 +90,15 @@ def compare_node_scores(
     within = True
     for node, value_a in a.scores.items():
         value_b = b.scores[node]
+        # A non-finite score can never be equivalent to anything: NaN compares
+        # False against every threshold, which would otherwise make it pass.
+        # This is how a rustworkx NaN was first caught, so it stays explicit.
+        if not (math.isfinite(value_a) and math.isfinite(value_b)):
+            within = False
+            notes.append(f"{node}: non-finite score ({value_a!r} vs {value_b!r})")
+            abs_errors.append(math.inf)
+            rel_errors.append(math.inf)
+            continue
         abs_error = abs(value_a - value_b)
         abs_errors.append(abs_error)
         denominator = max(abs(value_a), abs(value_b))

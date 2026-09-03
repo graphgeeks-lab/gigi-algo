@@ -47,6 +47,27 @@ cross-checked against another engine.
 
 Tested with rustworkx 0.18.1.
 
+## One node, three answers
+
+`single-node` -- one node, no edges -- is the smallest graph there is, and the
+engines cannot agree on it:
+
+| engine | score of the only node |
+|---|---|
+| reference | 0.0 (raw degree; the normaliser n - 1 is zero, so it is not applied) |
+| igraph | 0.0 (returns raw counts; Gigi skips the division) |
+| **networkx** | **1.0** by convention -- a lone node is maximally central |
+| **rustworkx** | **NaN** -- divides 0 by 0 without a guard |
+
+The definition is silent at n = 1, so every implementation has to invent an
+answer. NetworkX's is defensible and documented, and is recorded as a `semantic`
+divergence of severity low. rustworkx's is a bug -- NaN propagates into anything
+downstream -- and it is the case Gigi's `scores_finite` invariant exists to
+catch. It did, on the day the fixture was added.
+
+Recorded as `networkx-singleton-is-central` and `rustworkx-singleton-nan`, both
+reproduced by CI.
+
 ## Three engines, three normalisation conventions
 
 Nobody diverges here, because Gigi pins it — but it is worth knowing what each
@@ -90,5 +111,4 @@ Verified, not assumed:
 
 - Whether `mode: in` and `mode: out` diverge anywhere; only `all` is verified,
   because that is what `verification.parameters` pins.
-- `n = 1` and empty graphs across engines.
 - Weighted degree (strength), which should be its own algorithm entry.

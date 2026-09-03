@@ -2,9 +2,9 @@
 __pycache__/
 *.pyc
 *.egg-info/
-dist/
-build/
+/dist/
+/build/
 .gigi/
-site/
+/site/
 .pytest_cache/
 /plan.md

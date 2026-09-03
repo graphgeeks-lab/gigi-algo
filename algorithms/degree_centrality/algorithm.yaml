@@ -154,7 +154,7 @@ maths:
         - two, because it is both an out-edge and an in-edge
         - one
         - nothing, because a node is not its own neighbour
-      divergence: rustworkx-degree-incidence-count
+      divergences: [rustworkx-degree-incidence-count]
       datasets: [self-loop-small]
 
     - id: parallel_edge_counting
@@ -162,8 +162,21 @@ maths:
       choices:
         - twice, because degree counts incidences
         - once, because degree counts neighbours
-      divergence: rustworkx-degree-incidence-count
+      divergences: [rustworkx-degree-incidence-count]
       datasets: [duplicate-edge-small]
+
+    - id: singleton_normalisation
+      question: What is the degree centrality of the only node in a one-node graph?
+      choices:
+        - 0, the raw degree, because the normaliser n - 1 is zero and cannot be applied
+        - 1, by convention, because a lone node is as central as a node can be
+        - undefined (0/0), returned as NaN
+      divergences: [networkx-singleton-is-central, rustworkx-singleton-nan]
+      datasets: [single-node]
+      note: >
+        Three engines, three answers, on the smallest possible graph. The
+        reference picks 0 and says so; the point is that the definition does
+        not decide, so an implementation must, and should say which.
 
     - id: weight_handling
       question: Should edge weights contribute to degree?
@@ -235,6 +248,8 @@ engines:
     notes: Three functions for the three modes; disagrees on parallel edges and self loops.
 
 datasets:
+  - empty
+  - single-node
   - tiny-directed
   - dangling-small
   - disconnected-small
@@ -264,6 +279,49 @@ divergences:
     reported: "2026-09-03"
     detect:
       datasets: [weighted-small, self-loop-small, duplicate-edge-small]
+      engines: [reference, rustworkx]
+      parameters: {normalized: true, mode: all}
+      expect: differ
+
+  - id: networkx-singleton-is-central
+    category: semantic
+    severity: low
+    engines: [networkx]
+    summary: >
+      On a graph with exactly one node, nx.degree_centrality returns 1.0 by
+      convention: the normaliser n - 1 is zero, and NetworkX resolves the
+      undefined division by declaring a lone node maximally central. The
+      reference returns the raw degree, 0.0, and igraph agrees.
+    consequence: >
+      Harmless in practice -- nobody ranks a one-node graph -- but it is a
+      reminder that the definition is silent at n = 1 and every engine has to
+      invent an answer. Code that asserts scores are zero for isolated nodes
+      will be surprised here.
+    discovered_by: [dennis-irorere]
+    reported: "2026-09-03"
+    detect:
+      datasets: [single-node]
+      engines: [reference, networkx]
+      parameters: {normalized: true, mode: all}
+      expect: differ
+
+  - id: rustworkx-singleton-nan
+    category: bug
+    severity: high
+    engines: [rustworkx]
+    summary: >
+      On a graph with exactly one node, rx.degree_centrality returns NaN: it
+      divides the degree by n - 1 without guarding the zero. The reference,
+      NetworkX and igraph all return a number.
+    consequence: >
+      NaN propagates. Anything downstream that sums, sorts or compares the
+      scores gets a NaN back, usually far from where it was introduced. This is
+      the divergence that Gigi's `scores_finite` invariant exists to catch, and
+      it did.
+    discovered_by: [dennis-irorere]
+    reported: "2026-09-03"
+    detect:
+      datasets: [single-node]
       engines: [reference, rustworkx]
       parameters: {normalized: true, mode: all}
       expect: differ

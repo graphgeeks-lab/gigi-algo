@@ -217,6 +217,28 @@ def site_build(
 
 
 @app.command()
+def typst(
+    algorithm: str = typer.Argument(None, help="Algorithm id; omit for all."),
+    output: str = typer.Option("site/typst", "--output", "-o"),
+    pdf: bool = typer.Option(False, "--pdf", help="Also compile to PDF (needs gigi-algo[docs])."),
+    verify_first: bool = typer.Option(True, "--verify/--no-verify"),
+) -> None:
+    """Typeset an entry as a Typst document, for printing, review or citation.
+
+    Maths is rendered from the same LaTeX the spec stores, via mitex.
+    """
+    from gigi.typst import compile_available, write
+
+    if pdf and not compile_available():
+        console.print("[red]PDF needs the typst package:[/red] pip install 'gigi-algo[docs]'")
+        raise typer.Exit(1)
+
+    for algorithm_id in [algorithm] if algorithm else registry.list_algorithms():
+        for path in write(algorithm_id, output, pdf=pdf, verify_first=verify_first):
+            console.print(f"wrote {path}")
+
+
+@app.command()
 def status() -> None:
     """What is installed and what is verifiable in this environment."""
     console.print(f"engines available: {', '.join(available_engines())}")
