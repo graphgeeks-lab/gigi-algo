@@ -222,10 +222,14 @@ def typst(
     output: str = typer.Option("site/typst", "--output", "-o"),
     pdf: bool = typer.Option(False, "--pdf", help="Also compile to PDF (needs gigi-algo[docs])."),
     verify_first: bool = typer.Option(True, "--verify/--no-verify"),
+    review: bool = typer.Option(
+        False, "--review", help="Add the open questions from `gigi review` as margin notes."
+    ),
 ) -> None:
     """Typeset an entry as a Typst document, for printing, review or citation.
 
-    Maths is rendered from the same LaTeX the spec stores, via mitex.
+    Maths is rendered from the same LaTeX the spec stores, via mitex. With
+    --review, the gaps become margin notes and a reviewer checklist is appended.
     """
     from gigi.typst import compile_available, write
 
@@ -234,7 +238,7 @@ def typst(
         raise typer.Exit(1)
 
     for algorithm_id in [algorithm] if algorithm else registry.list_algorithms():
-        for path in write(algorithm_id, output, pdf=pdf, verify_first=verify_first):
+        for path in write(algorithm_id, output, pdf=pdf, verify_first=verify_first, review=review):
             console.print(f"wrote {path}")
 
 

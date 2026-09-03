@@ -41,6 +41,7 @@ gigi people                                        # who has contributed, and to
 gigi export -o registry.json                       # the whole registry, for machines
 gigi review pagerank                               # what to check before merging
 gigi typst pagerank --pdf                          # a printable, citable PDF of the entry
+gigi typst pagerank --pdf --review                 # same, with the open questions in the margin
 gigi engines                                       # what is installed here
 gigi inspect datasets/weighted-small               # cheap structural facts
 gigi compare pagerank -g weighted-small --defaults # reproduce the table above

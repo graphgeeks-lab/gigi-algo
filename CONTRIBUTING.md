@@ -244,6 +244,7 @@ when nothing stands in its way.
 ```bash
 gigi typst <algorithm>          # writes site/typst/<algorithm>.typ
 gigi typst <algorithm> --pdf    # needs: pip install 'gigi-algo[docs]'
+gigi typst <algorithm> --review # the gaps as margin notes, plus a reviewer checklist
 ```
 
 A printable, citable version of the entry -- maths rendered from the same LaTeX

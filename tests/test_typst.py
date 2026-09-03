@@ -49,3 +49,28 @@ def test_pdf_without_compiler_is_a_clear_error(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "compile_available", lambda: False)
     with pytest.raises(RuntimeError, match="gigi-algo\\[docs\\]"):
         write("degree_centrality", tmp_path, pdf=True, verify_first=False)
+
+
+def test_review_mode_adds_margin_notes_and_checklist():
+    from gigi.review import review
+
+    spec = registry.load_algorithm("pagerank")
+    plain = render(spec)
+    reviewed = render(spec, None, review("pagerank"))
+    assert "dashy-todo" not in plain and "#todo(" not in plain
+    assert "dashy-todo" in reviewed and "#todo(" in reviewed
+    assert "== For the reviewer" in reviewed
+    # pagerank has a choice point nothing tests; it should be flagged in the margin
+    # prose is escaped for Typst, so the identifier carries an escaped underscore
+    assert "convergence\_criterion" in reviewed
+
+
+def test_review_file_is_named_separately(tmp_path):
+    written = write("degree_centrality", tmp_path, review=True)
+    assert written[0].name == "degree_centrality.review.typ"
+
+
+def test_running_header_names_the_algorithm():
+    source = render(registry.load_algorithm("degree_centrality"))
+    assert "hydra" in source
+    assert "[Gigi · Degree Centrality]" in source

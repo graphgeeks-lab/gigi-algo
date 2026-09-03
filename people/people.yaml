@@ -1,32 +1,26 @@
 # The people registry.
 #
-# This file answers "who did the work in Gigi". It is deliberately separate from
-# the `provenance:` block in each algorithm.yaml, which answers "who created the
+# This file answers "who did the work in Gigi". It is deliberately separate from the `provenance:` block in each algorithm.yaml, which answers "who created the
 # algorithm" -- a different question with a different, usually messier answer.
 #
-# Every id used in an algorithm's `gigi:` block or a divergence's
-# `discovered_by:` must appear here, or the test suite fails. Attribution is a
-# claim like any other.
-#
+# Every id used in an algorithm's `gigi:` block or a divergence's `discovered_by:` must appear here, or the test suite fails. Attribution is a claim like any other.
 # Roles come from a fixed vocabulary (see Role in gigi/models.py):
 #   algorithm-steward     spec-curator          reference-author
 #   verifier-author       evaluator-author      adapter-author
 #   dataset-curator       divergence-discoverer benchmark-maintainer
 #   frontier-researcher   reviewer
 #
-# There is no score and no leaderboard. What a profile shows is lineage: which
-# algorithms, which artifacts, which findings.
+# There is no score and no leaderboard. What a profile shows is lineage: which algorithms, which artifacts, which findings.
 
-# Handles, not URLs: the site builds the link, and a handle survives a platform
-# changing its URL scheme. `links` is free-form for anything without a named
+# Handles, not URLs: the site builds the link, and a handle survives a platform changing its URL scheme. `links` is free-form for anything without a named
 # field -- mastodon, bluesky, a scholar profile, a blog.
 
 - id: dennis-irorere
   name: Dennis Irorere
-  github: null
-  linkedin: null
+  github: https://github.com/denironyx/
+  linkedin: https://www.linkedin.com/in/dennisirorere/
   orcid: null
-  website: null
+  website: https://denniseirorere.com/
   links: {}
   affiliation: GraphGeeks
   interests:
