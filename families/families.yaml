@@ -1,0 +1,165 @@
+# The algorithm taxonomy.
+#
+# A family is not a folder and not a tag. It is a *question*, and an algorithm
+# belongs to a family when it answers that question. That framing does real
+# work: "which centrality should I use?" is answerable only if the family knows
+# what it is for, and an agent choosing between PageRank and betweenness needs
+# the question, not the label.
+#
+# `parent` gives a shallow hierarchy; `related` links families that are
+# routinely confused or routinely combined. Every algorithm's `family:` must
+# resolve to an id here, so a typo is an error rather than a new family.
+#
+# Families listed here that have no algorithms yet are deliberate: they are the
+# roadmap, and they tell a contributor where a new algorithm would go.
+
+- id: traversal
+  name: Traversal
+  question: In what order do I reach the nodes, and which are reachable at all?
+  summary: >
+    Systematic visiting of nodes outward from one or more starting points. The
+    order is the algorithm: breadth-first gives shortest hop counts, depth-first
+    gives the structure needed for ordering and connectivity.
+  parent: null
+  related: [shortest-paths, connectivity, ordering]
+
+- id: search
+  name: Search
+  question: Where is the node, path or structure I am looking for?
+  summary: >
+    Traversal with a goal test and, usually, a heuristic that decides what to
+    look at next. The distinction from plain traversal is that search may stop
+    early and may be guided.
+  parent: traversal
+  related: [shortest-paths]
+
+- id: paths
+  name: Paths and distances
+  question: How do I get from here to there, and how far is it?
+  summary: >
+    Everything concerned with routes between nodes and the cost of taking them.
+  parent: null
+  related: [traversal, flows]
+
+- id: shortest-paths
+  name: Shortest paths
+  question: What is the cheapest route, and what does it cost?
+  summary: >
+    Minimum-cost routes under an edge weighting. Splits by what the weights are
+    allowed to be -- non-negative, negative, or uniform -- which is why BFS,
+    Dijkstra and Bellman-Ford are three algorithms rather than one.
+  parent: paths
+  related: [traversal, spanning]
+
+- id: connectivity
+  name: Connectivity
+  question: Which parts of the graph hold together, and what breaks them apart?
+  summary: >
+    Components, strong components, articulation points, bridges. Structure at
+    the level of "can these two nodes reach each other".
+  parent: null
+  related: [traversal, flows]
+
+- id: centrality
+  name: Centrality
+  question: Which nodes matter, and in what sense of "matter"?
+  summary: >
+    Importance measures. The family name is not enough to choose within it:
+    degree, PageRank, betweenness and closeness formalise four different
+    intuitions about importance, and picking the wrong one answers the wrong
+    question convincingly.
+  parent: null
+  related: [community, similarity]
+
+- id: community
+  name: Community detection
+  question: Which nodes belong together?
+  summary: >
+    Partitioning into groups that are densely connected internally. Mostly
+    heuristic, frequently stochastic, and therefore the family where "the same
+    algorithm gave a different answer" is expected rather than alarming.
+  parent: null
+  related: [centrality, dense-subgraphs]
+
+- id: spanning
+  name: Spanning structures
+  question: What is the cheapest structure that touches every node?
+  summary: >
+    Minimum spanning trees and arborescences: keep the graph connected while
+    discarding as much weight as possible.
+  parent: null
+  related: [shortest-paths, connectivity]
+
+- id: ordering
+  name: Ordering
+  question: In what sequence can these nodes be processed?
+  summary: >
+    Topological sorts and related linearisations, where edges are constraints
+    on order rather than distances.
+  parent: null
+  related: [traversal, connectivity]
+
+- id: flows
+  name: Flows and cuts
+  question: How much can pass through, and where is the bottleneck?
+  summary: >
+    Maximum flow, minimum cut, and their many equivalences. The family where
+    duality is doing most of the work.
+  parent: null
+  related: [matching, connectivity]
+
+- id: matching
+  name: Matching
+  question: How do I pair these up?
+  summary: >
+    Maximum and weighted matchings, assignment problems. Often reducible to
+    flow, which is exactly the kind of relationship worth recording.
+  parent: null
+  related: [flows, assignment]
+
+- id: dense-subgraphs
+  name: Dense subgraphs
+  question: Where is the graph tightly knit?
+  summary: >
+    k-cores, k-trusses, cliques. Locally dense regions, usually defined by a
+    degree or connectivity threshold rather than by optimising a global score.
+  parent: null
+  related: [community, structure]
+
+- id: assignment
+  name: Assignment and covering
+  question: How few labels, colours or chosen nodes will do?
+  summary: >
+    Graph colouring, independent sets, dominating sets, vertex cover. Mostly
+    hard to optimise and cheap to verify -- which makes this family unusually
+    well suited to machine search.
+  parent: null
+  related: [matching, dense-subgraphs]
+
+- id: structure
+  name: Local structure
+  question: What shape is the neighbourhood around a node?
+  summary: >
+    Triangle counts, clustering coefficients, degree distributions. Descriptive
+    measures computed from a node's immediate surroundings.
+  parent: null
+  related: [centrality, dense-subgraphs]
+
+- id: similarity
+  name: Similarity and comparison
+  question: How alike are these two nodes, or these two graphs?
+  summary: >
+    Node similarity, graph kernels, isomorphism and edit distance. The family
+    that answers "have I seen this before".
+  parent: null
+  related: [centrality, structure]
+
+- id: temporal
+  name: Temporal graphs
+  question: What changes, and when?
+  summary: >
+    Algorithms over graphs whose edges carry time. Mostly reformulations of the
+    families above with a validity interval attached, which is why they are
+    kept together rather than scattered.
+  parent: null
+  related: [paths, connectivity]

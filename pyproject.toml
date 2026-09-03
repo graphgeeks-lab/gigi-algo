@@ -1,0 +1,42 @@
+[project]
+name = "gigi-algo"
+version = "0.1.0"
+description = "An executable registry of graph algorithm semantics: run the same algorithm across engines and see where they disagree."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+    "pyarrow>=15.0",
+    "typer>=0.12",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+# networkx.pagerank goes through scipy, so scipy travels with the extra.
+networkx = ["networkx>=3.0", "scipy>=1.10"]
+igraph = ["python-igraph>=0.11"]
+rustworkx = ["rustworkx>=0.14"]
+all = ["networkx>=3.0", "scipy>=1.10", "python-igraph>=0.11", "rustworkx>=0.14"]
+dev = [
+    "pytest>=8.0",
+    "networkx>=3.0",
+    "scipy>=1.10",
+    "python-igraph>=0.11",
+    "rustworkx>=0.14",
+]
+
+[project.scripts]
+gigi = "gigi.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gigi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
