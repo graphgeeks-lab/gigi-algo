@@ -42,13 +42,13 @@ def last_run() -> RunResult | None:
 
 
 def save_report(report: VerificationReport) -> Path:
-    path = _dir("reports") / f"{report.algorithm_id}.json"
+    path = _dir("reports") / f"{report.method_id}.json"
     path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     return path
 
 
-def load_report(algorithm_id: str) -> VerificationReport | None:
-    path = state_dir() / "reports" / f"{algorithm_id}.json"
+def load_report(method_id: str) -> VerificationReport | None:
+    path = state_dir() / "reports" / f"{method_id}.json"
     if not path.is_file():
         return None
     return VerificationReport.model_validate_json(path.read_text(encoding="utf-8"))

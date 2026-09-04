@@ -1,0 +1,29 @@
+id: cheapest_route
+name: Cheapest route
+domain: graph
+
+question: >
+  What is the cheapest way to get from here to there, and what does it cost?
+
+description: >
+  Find a minimum-cost path between nodes under an edge weighting, where the
+  weight is a cost to be minimised. Named here mainly to be ruled out: it is
+  the problem most often confused with an influence ranking, and it reads edge
+  weight in the opposite direction.
+
+input_kinds: [graph]
+output_kinds: [node_score]
+
+related_problems: []
+
+ai_context:
+  instructions: >
+    Choose this when the user says shortest, nearest, fastest, cheapest or
+    route. Note the weight semantics: here a larger weight is *worse*, which
+    is the opposite of what a weighted influence ranking assumes about the
+    same column. No method solves it yet; Dijkstra arrives in v0.3.
+  synonyms:
+    - shortest path
+    - routing
+    - nearest
+    - how do I get from A to B

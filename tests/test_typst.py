@@ -7,15 +7,15 @@ import pytest
 from gigi import registry
 from gigi.typst import compile_available, esc, render, write
 
-ALGORITHMS = registry.list_algorithms()
+ALGORITHMS = registry.list_methods()
 
 
-@pytest.mark.parametrize("algorithm_id", ALGORITHMS)
-def test_source_carries_every_section(algorithm_id):
-    spec = registry.load_algorithm(algorithm_id)
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_source_carries_every_section(method_id):
+    spec = registry.load_method(method_id)
     source = render(spec)
-    for heading in ("= " + spec.name, "== Mathematics", "== Parameters", "== Engines"):
-        assert heading in source, f"{algorithm_id}: missing {heading!r}"
+    for heading in ("= " + spec.name, "== Mathematics", "== Parameters", "== Backends"):
+        assert heading in source, f"{method_id}: missing {heading!r}"
     if spec.divergences:
         assert "== Divergences" in source
         for divergence in spec.divergences:
@@ -28,16 +28,25 @@ def test_source_carries_every_section(algorithm_id):
 
 def test_prose_is_escaped_but_identifiers_are_not():
     assert esc("a_b #c *d*") == "a\\_b \\#c \\*d\\*"
-    source = render(registry.load_algorithm("pagerank"))
+    source = render(registry.load_method("pagerank"))
     # Identifiers sit in raw spans and must not carry escaped underscores.
     assert "`scores_sum_to_one`" in source
     assert "scores\\_sum" not in source
 
 
 @pytest.mark.skipif(not compile_available(), reason="typst compiler not installed")
-def test_compiles_to_pdf(tmp_path):
-    """Needs the network once, to fetch the mitex package."""
-    written = write("degree_centrality", tmp_path, pdf=True, verify_first=False)
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_compiles_to_pdf(tmp_path, method_id):
+    r"""Every entry, not one of them.
+
+    `latex:` fields are handed to mitex, which does not accept all of LaTeX and
+    whose output does not survive every Typst release -- `\langle` compiles to a
+    symbol Typst 0.15 no longer has. A formula that cannot be typeset is a claim
+    that cannot be printed or cited, and only compiling each entry finds it.
+
+    Needs the network once, to fetch the mitex package.
+    """
+    written = write(method_id, tmp_path, pdf=True, verify_first=False)
     pdf = [p for p in written if p.suffix == ".pdf"]
     assert pdf and pdf[0].stat().st_size > 10_000
     assert pdf[0].read_bytes()[:5] == b"%PDF-"
@@ -54,7 +63,7 @@ def test_pdf_without_compiler_is_a_clear_error(tmp_path, monkeypatch):
 def test_review_mode_adds_margin_notes_and_checklist():
     from gigi.review import review
 
-    spec = registry.load_algorithm("pagerank")
+    spec = registry.load_method("pagerank")
     plain = render(spec)
     reviewed = render(spec, None, review("pagerank"))
     assert "dashy-todo" not in plain and "#todo(" not in plain
@@ -62,7 +71,7 @@ def test_review_mode_adds_margin_notes_and_checklist():
     assert "== For the reviewer" in reviewed
     # pagerank has a choice point nothing tests; it should be flagged in the margin
     # prose is escaped for Typst, so the identifier carries an escaped underscore
-    assert "convergence\_criterion" in reviewed
+    assert r"convergence\_criterion" in reviewed
 
 
 def test_review_file_is_named_separately(tmp_path):
@@ -71,6 +80,6 @@ def test_review_file_is_named_separately(tmp_path):
 
 
 def test_running_header_names_the_algorithm():
-    source = render(registry.load_algorithm("degree_centrality"))
+    source = render(registry.load_method("degree_centrality"))
     assert "hydra" in source
     assert "[Gigi · Degree Centrality]" in source

@@ -4,9 +4,9 @@
 
 ## Context
 
-Every engine is verified against the reference implementation. That makes the
+Every backend is verified against the reference implementation. That makes the
 reference the oracle — and an oracle nobody checks. If `reference.py` is wrong,
-every cross-engine comparison passes anyway, because they all agree with each
+every cross-backend comparison passes anyway, because they all agree with each
 other about the wrong answer. The conformance suite cannot see this: it would
 be checking the code against itself.
 
@@ -25,7 +25,7 @@ nothing; a case derived from the definition proves the reference implements
 the definition. Contributors write YAML; the test suite is generated from it.
 
 Inline graphs check the reference alone. Fixture-backed cases also run on every
-engine, where a declared divergence can excuse exactly the engine and fixture
+backend, where a declared divergence can excuse exactly the backend and fixture
 it names.
 
 **One price list.** `gigi/requirements.py` holds every requirement with the
@@ -37,7 +37,7 @@ checked and reported as what promotion would take.
 |---|---|
 | `frontier` / `historical` | the entry exists: reference, family, people resolve |
 | `emerging` | the maths is stated; one invariant runs; two known answers, each derived; divergences credited; notes written |
-| `stable` | every divergence has a `detect` block and a choice point; four known answers; provenance cited; runs on `empty` and `single-node`; two engines beyond the reference |
+| `stable` | every divergence has a `detect` block and a choice point; four known answers; provenance cited; runs on `empty` and `single-node`; two backends beyond the reference |
 
 **Degenerate fixtures are first-class.** `empty` and `single-node` are where
 implementations disagree most and are tested least. On the day they were added

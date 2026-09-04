@@ -7,7 +7,7 @@ demands of the entry, and whether the entry will run at all.
 |---|---|---|---|
 | `frontier` | we are not standing behind this | almost nothing: a reference implementation, a family, resolvable people | **only with explicit opt-in** |
 | `emerging` | the maths is written down and independently checked | definition, an executed invariant, two derived known answers, credited divergences, real notes | yes |
-| `stable` | every claim is testable, and has been tested | all of the above, plus testable divergences tied to choice points, four known answers, cited provenance, degenerate fixtures, two engines beyond the reference | yes |
+| `stable` | every claim is testable, and has been tested | all of the above, plus testable divergences tied to choice points, four known answers, cited provenance, degenerate fixtures, two backends beyond the reference | yes |
 | `historical` | frozen; kept for the record | same low bar as `frontier` | yes, but never recommended |
 
 The exact list lives in [`gigi/requirements.py`](../gigi/requirements.py) and
@@ -34,19 +34,19 @@ What `stable` adds over `emerging`, and why:
 - **Every divergence has a `detect:` block.** An untestable claim rots. A
   `stable` entry's divergences are re-run on every build.
 - **Every divergence is tied to a choice point** in `maths.under_determined`.
-  Engines do not differ at random; if they differ, the definition left room,
+  Backends do not differ at random; if they differ, the definition left room,
   and the entry should say where.
 - **Four known answers, not two.** More independent checks on the oracle.
 - **Original authors and work cited.** A stable entry is one people will cite.
 - **It runs on `empty` and `single-node`.** The degenerate cases most
   implementations are never tested on — where the 0/1/NaN split was found.
-- **Two engines besides the reference.** Cross-engine evidence needs a cross.
+- **Two backends besides the reference.** Cross-backend evidence needs a cross.
 
 ### 2. Promote
 
 ```bash
 gigi promote degree_centrality --dry-run   # check, change nothing
-gigi promote degree_centrality             # check, then edit algorithm.yaml
+gigi promote degree_centrality             # check, then edit method.yaml
 ```
 
 `promote` re-runs every requirement of the target tier and **refuses** if any
@@ -74,7 +74,7 @@ cheap to keep from the start, and expensive to introduce afterwards.
 ## Using `frontier`
 
 `frontier` is for work you want in the registry but do not yet vouch for: an
-implementation of a recent paper, a variant you are exploring, an engine
+implementation of a recent paper, a variant you are exploring, a backend
 adapter whose semantics you have not pinned down, or — later — a
 machine-generated candidate.
 
@@ -98,7 +98,7 @@ GIGI_ALLOW_FRONTIER=1 gigi verify          # a whole session
 ```
 
 ```python
-gigi.run("my_variant", engine="reference", graph=graph, allow_frontier=True)
+gigi.run("my_variant", backend="reference", graph=graph, allow_frontier=True)
 ```
 
 The gate is in the harness, not the CLI, so **every** caller inherits it — the
@@ -144,7 +144,7 @@ message explaining itself.
 
 Every run records the gigi version that produced it (`RunResult.gigi_version`),
 and every verification report carries it too. `gigi version` shows the build,
-the engine versions, and — the part that catches real mistakes — **which
+the backend versions, and — the part that catches real mistakes — **which
 registry is being read**:
 
 ```console

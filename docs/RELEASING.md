@@ -37,7 +37,7 @@ tag, in four jobs, each of which stops rather than guesses:
 
 | job | it refuses to continue unless |
 |---|---|
-| **check** | tag, `pyproject.toml` and `CITATION.cff` name the same version; `CHANGELOG.md` has a `## [x.y.z]` section with real notes; the version is **not** already on PyPI; the suite passes with every engine and with NetworkX alone; `gigi verify` passes |
+| **check** | tag, `pyproject.toml` and `CITATION.cff` name the same version; `CHANGELOG.md` has a `## [x.y.z]` section with real notes; the version is **not** already on PyPI; the suite passes with every backend and with NetworkX alone; `gigi verify` passes |
 | **build** | the wheel installs clean and `gigi.__version__` reports the tagged version |
 | **publish** | trusted publishing succeeds (no token exists anywhere) |
 | **release** | PyPI confirms the version is installable — *then* a GitHub Release is created with the changelog section as notes and the published files attached |

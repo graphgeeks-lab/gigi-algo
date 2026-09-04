@@ -23,7 +23,7 @@ alone.
 | What it computes | `maths.definition` (statement + LaTeX) | `maths.md` |
 | What must be true of the answer | `maths.invariants` — **executed** | `maths.md` |
 | Where the definition leaves a choice | `maths.under_determined` | `maths.md` |
-| Where engines actually differ | `divergences` — **executed** | `notes.md` |
+| Where backends actually differ | `divergences` — **executed** | `notes.md` |
 | What it is like, and how | `relationships` (typed, conditioned) | — |
 | What kind of question it answers | `family` → `families/families.yaml` | — |
 | Who created it | `provenance` | `attribution_notes` |
@@ -32,12 +32,12 @@ alone.
 Four rules follow:
 
 1. **Claims are executable, or explicitly marked as not.** `invariants` run on
-   every engine and every fixture. `divergences` are reproduced. A property
+   every backend and every fixture. `divergences` are reproduced. A property
    with `check: true` whose id names no function in `gigi/invariants.py` fails
    the build. An agent can verify rather than trust.
 2. **Ambiguity is a first-class record.** `under_determined` names the choice
    points in the definition, so a reader knows where it must ask rather than
-   guess — and so a new engine can be assessed before it is ever run.
+   guess — and so a new backend can be assessed before it is ever run.
 3. **Relationships are typed and conditioned.** "See also" tells a machine
    nothing. "Generalises eigenvector centrality, and coincides with it as
    damping approaches 1 on a strongly connected graph" tells it when a
@@ -56,7 +56,7 @@ checks.
 ## Consequences
 
 - Stating a property costs almost nothing and buys verification everywhere: two
-  lines of YAML are asserted across every engine and fixture, forever.
+  lines of YAML are asserted across every backend and fixture, forever.
 - The registry is a graph — algorithms, families, people, fixtures, findings,
   and typed edges between them. It can be traversed, and eventually analysed
   with Gigi's own algorithms.

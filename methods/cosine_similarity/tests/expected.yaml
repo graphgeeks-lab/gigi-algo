@@ -1,0 +1,91 @@
+# Known answers for cosine similarity. Each `derived` says where the expected
+# value came from -- never from running the code. See the pagerank file for why.
+#
+# Keys are canonical pairs, `a|b` with the two ids sorted.
+
+cases:
+  - id: orthogonal_is_zero
+    description: Two vectors at right angles.
+    derived: >
+      Definition. The dot product of [1, 0] and [0, 1] is 0, so the numerator is
+      zero and the norms cannot make it anything else.
+    vectors:
+      rows:
+        x: [1, 0]
+        y: [0, 1]
+    expected: {"x|y": 0.0}
+
+  - id: parallel_is_one
+    description: One vector is a positive multiple of the other.
+    derived: >
+      Cauchy-Schwarz with equality. y = 2x, so <x, y> = 2<x, x> = 2||x||^2 and
+      ||y|| = 2||x||; the twos cancel and the ratio is exactly 1. This is the
+      case that pins scale invariance.
+    vectors:
+      rows:
+        x: [1, 2, 3]
+        y: [2, 4, 6]
+    expected: {"x|y": 1.0}
+
+  - id: antiparallel_is_minus_one
+    description: Opposite directions.
+    derived: >
+      Definition. <[1, 0], [-1, 0]> = -1, both norms are 1, so the cosine is -1
+      -- the lower bound of the interval the invariant asserts.
+    vectors:
+      rows:
+        x: [1, 0]
+        y: [-1, 0]
+    expected: {"x|y": -1.0}
+
+  - id: forty_five_degrees
+    description: The unit vector and the diagonal.
+    derived: >
+      Geometry. [1, 0] and [1, 1] are 45 degrees apart, and cos 45 = 1/sqrt(2)
+      = 0.7071067811865475. Arithmetic agrees: dot 1, norms 1 and sqrt(2).
+    vectors:
+      rows:
+        x: [1, 0]
+        y: [1, 1]
+    expected: {"x|y": 0.7071067811865475}
+
+  - id: three_four_five_triangle
+    description: A pair with an exact non-trivial answer.
+    derived: >
+      Hand calculation. <[3, 4], [0, 5]> = 20; ||[3, 4]|| = 5 and ||[0, 5]|| = 5,
+      so the cosine is 20/25 = 0.8 exactly. Chosen because 0.8 is representable
+      in binary floating point, so the case tests the measure rather than the
+      rounding.
+    vectors:
+      rows:
+        p: [3, 4]
+        q: [0, 5]
+    expected: {"p|q": 0.8}
+
+  - id: vectors_small_all_pairs
+    description: Every pair of the vectors-small fixture.
+    derived: >
+      Definition, pair by pair. b is 2a, so a|b = 1 by scale invariance; d is
+      -a, so a|d and b|d are -1; c is orthogonal to all three, so every pair
+      involving it is 0. Six pairs, no arithmetic beyond a sign.
+    dataset: vectors-small
+    expected:
+      "a|b": 1.0
+      "a|c": 0.0
+      "a|d": -1.0
+      "b|c": 0.0
+      "b|d": -1.0
+      "c|d": 0.0
+
+  - id: symmetry_does_not_depend_on_input_order
+    description: The same two vectors, declared in the other order.
+    derived: >
+      Symmetry. cos(x, y) = cos(y, x) because the dot product commutes, so
+      listing q before p must produce the same single key with the same value as
+      three_four_five_triangle above. A backend that keyed results by input
+      order rather than by sorted pair would pass that case and fail this one.
+    vectors:
+      rows:
+        q: [0, 5]
+        p: [3, 4]
+    expected: {"p|q": 0.8}

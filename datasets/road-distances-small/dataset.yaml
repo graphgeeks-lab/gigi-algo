@@ -1,0 +1,24 @@
+id: road-distances-small
+kind: graph
+description: >
+  A weighted graph whose weight column is called `distance` and means one --
+  kilometres between towns. Numerically unremarkable; it exists for the
+  semantic check. Every method here reads edge weight as strength, so a 120 km
+  edge is read as a hundred-odd times stronger than a 1 km edge, which is
+  backwards. `gigi why pagerank --graph road-distances-small` should say so.
+directed: true
+node_id: id
+edges:
+  source: source
+  target: target
+  weight: distance
+features:
+  weighted: true
+  dangling_nodes: false
+  disconnected: false
+  self_loops: false
+  duplicate_edges: false
+expected:
+  nodes: 3
+  edges: 4
+license: CC0

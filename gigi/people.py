@@ -73,7 +73,7 @@ def exists(person_id: str) -> bool:
 class Contribution:
     """One thing a person did, and to what."""
 
-    algorithm_id: str
+    method_id: str
     role: str
     detail: str = ""
 
@@ -88,7 +88,7 @@ class Profile:
 
     @property
     def algorithms(self) -> list[str]:
-        return sorted({c.algorithm_id for c in [*self.contributions, *self.discoveries]})
+        return sorted({c.method_id for c in [*self.contributions, *self.discoveries]})
 
 
 # How each Credits field reads on a profile page.
@@ -109,23 +109,23 @@ def profile(person_id: str) -> Profile:
 
     result = Profile(person=get_person(person_id))
 
-    for algorithm_id in registry.list_algorithms():
-        spec = registry.load_algorithm(algorithm_id)
+    for method_id in registry.list_methods():
+        spec = registry.load_method(method_id)
 
         for attribute, label in _CREDIT_ROLES:
             if person_id in getattr(spec.credits, attribute):
-                result.contributions.append(Contribution(algorithm_id, label))
+                result.contributions.append(Contribution(method_id, label))
 
-        for engine, contributors in spec.credits.adapter_contributors.items():
+        for backend, contributors in spec.credits.adapter_contributors.items():
             if person_id in contributors:
                 result.contributions.append(
-                    Contribution(algorithm_id, "engine adapter", engine)
+                    Contribution(method_id, "backend adapter", backend)
                 )
 
         for divergence in spec.divergences:
             if person_id in divergence.discovered_by:
                 result.discoveries.append(
-                    Contribution(algorithm_id, "divergence", divergence.id)
+                    Contribution(method_id, "divergence", divergence.id)
                 )
 
     return result
@@ -139,13 +139,13 @@ def referenced_ids() -> dict[str, list[str]]:
     from gigi import registry
 
     found: dict[str, list[str]] = {}
-    for algorithm_id in registry.list_algorithms():
-        spec = registry.load_algorithm(algorithm_id)
+    for method_id in registry.list_methods():
+        spec = registry.load_method(method_id)
         for person_id in spec.credits.everyone():
-            found.setdefault(person_id, []).append(f"{algorithm_id}: gigi credits")
+            found.setdefault(person_id, []).append(f"{method_id}: gigi credits")
         for divergence in spec.divergences:
             for person_id in divergence.discovered_by:
                 found.setdefault(person_id, []).append(
-                    f"{algorithm_id}: divergence {divergence.id}"
+                    f"{method_id}: divergence {divergence.id}"
                 )
     return found

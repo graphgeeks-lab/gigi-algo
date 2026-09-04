@@ -15,14 +15,14 @@ def test_review_covers_the_requirements_of_the_claimed_tier():
     alongside the four things that only running the algorithm can settle."""
     from gigi import registry, requirements
 
-    spec = registry.load_algorithm("pagerank")
+    spec = registry.load_method("pagerank")
     names = {check.name for check in review("pagerank").checks}
     for outcome in requirements.check(spec):
         if outcome.required:
             assert outcome.requirement.description in names
     for expected in (
         "reference gives every known answer",
-        "engines agree where the registry says they agree",
+        "backends agree where the registry says they agree",
         "invariants hold on every run, or the failure is a declared divergence",
         "declared divergences still reproduce",
     ):

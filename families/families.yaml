@@ -15,6 +15,7 @@
 
 - id: traversal
   name: Traversal
+  domain: graph
   question: In what order do I reach the nodes, and which are reachable at all?
   summary: >
     Systematic visiting of nodes outward from one or more starting points. The
@@ -25,6 +26,7 @@
 
 - id: search
   name: Search
+  domain: graph
   question: Where is the node, path or structure I am looking for?
   summary: >
     Traversal with a goal test and, usually, a heuristic that decides what to
@@ -35,6 +37,7 @@
 
 - id: paths
   name: Paths and distances
+  domain: graph
   question: How do I get from here to there, and how far is it?
   summary: >
     Everything concerned with routes between nodes and the cost of taking them.
@@ -43,6 +46,7 @@
 
 - id: shortest-paths
   name: Shortest paths
+  domain: graph
   question: What is the cheapest route, and what does it cost?
   summary: >
     Minimum-cost routes under an edge weighting. Splits by what the weights are
@@ -53,6 +57,7 @@
 
 - id: connectivity
   name: Connectivity
+  domain: graph
   question: Which parts of the graph hold together, and what breaks them apart?
   summary: >
     Components, strong components, articulation points, bridges. Structure at
@@ -62,6 +67,7 @@
 
 - id: centrality
   name: Centrality
+  domain: graph
   question: Which nodes matter, and in what sense of "matter"?
   summary: >
     Importance measures. The family name is not enough to choose within it:
@@ -73,6 +79,7 @@
 
 - id: community
   name: Community detection
+  domain: graph
   question: Which nodes belong together?
   summary: >
     Partitioning into groups that are densely connected internally. Mostly
@@ -83,6 +90,7 @@
 
 - id: spanning
   name: Spanning structures
+  domain: graph
   question: What is the cheapest structure that touches every node?
   summary: >
     Minimum spanning trees and arborescences: keep the graph connected while
@@ -92,6 +100,7 @@
 
 - id: ordering
   name: Ordering
+  domain: graph
   question: In what sequence can these nodes be processed?
   summary: >
     Topological sorts and related linearisations, where edges are constraints
@@ -101,6 +110,7 @@
 
 - id: flows
   name: Flows and cuts
+  domain: graph
   question: How much can pass through, and where is the bottleneck?
   summary: >
     Maximum flow, minimum cut, and their many equivalences. The family where
@@ -110,6 +120,7 @@
 
 - id: matching
   name: Matching
+  domain: graph
   question: How do I pair these up?
   summary: >
     Maximum and weighted matchings, assignment problems. Often reducible to
@@ -119,6 +130,7 @@
 
 - id: dense-subgraphs
   name: Dense subgraphs
+  domain: graph
   question: Where is the graph tightly knit?
   summary: >
     k-cores, k-trusses, cliques. Locally dense regions, usually defined by a
@@ -128,6 +140,7 @@
 
 - id: assignment
   name: Assignment and covering
+  domain: graph
   question: How few labels, colours or chosen nodes will do?
   summary: >
     Graph colouring, independent sets, dominating sets, vertex cover. Mostly
@@ -138,6 +151,7 @@
 
 - id: structure
   name: Local structure
+  domain: graph
   question: What shape is the neighbourhood around a node?
   summary: >
     Triangle counts, clustering coefficients, degree distributions. Descriptive
@@ -147,6 +161,7 @@
 
 - id: similarity
   name: Similarity and comparison
+  domain: graph
   question: How alike are these two nodes, or these two graphs?
   summary: >
     Node similarity, graph kernels, isomorphism and edit distance. The family
@@ -156,6 +171,7 @@
 
 - id: temporal
   name: Temporal graphs
+  domain: graph
   question: What changes, and when?
   summary: >
     Algorithms over graphs whose edges carry time. Mostly reformulations of the
@@ -163,3 +179,15 @@
     kept together rather than scattered.
   parent: null
   related: [paths, connectivity]
+
+- id: vector-similarity
+  name: Vector similarity
+  domain: similarity
+  question: How alike are these two vectors?
+  summary: >
+    Measures over pairs of numeric vectors: cosine, Euclidean, Jaccard,
+    correlation. The family where the choice of measure *is* the modelling
+    decision -- each one discards something different, and the thing it discards
+    is usually the thing someone later needed.
+  parent: null
+  related: [similarity]

@@ -22,7 +22,7 @@ from pathlib import Path
 
 from gigi import __version__, people, registry
 from gigi.harness import verify
-from gigi.models import AlgorithmSpec, VerificationReport
+from gigi.models import MethodSpec, VerificationReport
 
 PACKAGES = {
     "mitex": "@preview/mitex:0.2.6",  # renders the LaTeX we store
@@ -107,7 +107,7 @@ def _todo(text: str, color: str = "warn") -> str:
 # --- document frame -------------------------------------------------------------
 
 
-def _preamble(spec: AlgorithmSpec, review: bool) -> str:
+def _preamble(spec: MethodSpec, review: bool) -> str:
     right = "4.4cm" if review else "2cm"
     imports = "\n".join(
         [
@@ -149,7 +149,7 @@ def _preamble(spec: AlgorithmSpec, review: bool) -> str:
 # --- sections ---------------------------------------------------------------------
 
 
-def _header(spec: AlgorithmSpec) -> list[str]:
+def _header(spec: MethodSpec) -> list[str]:
     return [
         f"= {esc(spec.name)}",
         " ".join(
@@ -160,12 +160,12 @@ def _header(spec: AlgorithmSpec) -> list[str]:
             ]
         ),
         "#v(4pt)",
-        esc(spec.problem),
+        esc(spec.summary),
         "",
     ]
 
 
-def _maths(spec: AlgorithmSpec, review: bool) -> list[str]:
+def _maths(spec: MethodSpec, review: bool) -> list[str]:
     maths = spec.maths
     if not (maths.summary or maths.definition):
         return []
@@ -190,9 +190,9 @@ def _maths(spec: AlgorithmSpec, review: bool) -> list[str]:
         rows = []
         for c in maths.under_determined:
             if c.divergences:
-                measured = _pill("engines differ", "bad") + " " + ", ".join(_raw(d) for d in c.divergences)
+                measured = _pill("backends differ", "bad") + " " + ", ".join(_raw(d) for d in c.divergences)
             elif c.datasets:
-                measured = _pill("engines agree", "ok") + " on " + ", ".join(_raw(d) for d in c.datasets)
+                measured = _pill("backends agree", "ok") + " on " + ", ".join(_raw(d) for d in c.datasets)
             else:
                 measured = _pill("untested", "warn")
                 if review:
@@ -203,7 +203,7 @@ def _maths(spec: AlgorithmSpec, review: bool) -> list[str]:
     return out
 
 
-def _origin(spec: AlgorithmSpec) -> list[str]:
+def _origin(spec: MethodSpec) -> list[str]:
     prov = spec.provenance
     if not (prov.original_authors or prov.original_work):
         return []
@@ -227,9 +227,11 @@ def _origin(spec: AlgorithmSpec) -> list[str]:
     return out
 
 
-def _parameters_and_engines(spec: AlgorithmSpec, review: bool) -> list[str]:
-    missing = sorted(set(registry.ENGINE_NAMES) - set(registry.implemented_engines(spec.id)))
-    engines_heading = "== Engines"
+def _parameters_and_engines(spec: MethodSpec, review: bool) -> list[str]:
+    missing = sorted(
+        set(registry.plausible_backends(spec)) - set(registry.implemented_backends(spec.id))
+    )
+    engines_heading = "== Backends"
     if review and missing:
         engines_heading += _todo(f"No implementation yet for: {', '.join(missing)}.", "accent")
     return [
@@ -242,15 +244,15 @@ def _parameters_and_engines(spec: AlgorithmSpec, review: bool) -> list[str]:
               esc(p.description)] for p in spec.parameters],
         ),
         engines_heading,
-        _table("(auto, 1fr)", ["engine", "notes"],
-               [[_raw(n), esc(s.notes or "")] for n, s in spec.engines.items()]),
+        _table("(auto, 1fr)", ["backend", "notes"],
+               [[_raw(n), esc(s.notes or "")] for n, s in spec.backends.items()]),
     ]
 
 
 _SEVERITY_COLOR = {"critical": "bad", "high": "bad", "medium": "warn", "low": "muted", "info": "muted"}
 
 
-def _divergences(spec: AlgorithmSpec, report: VerificationReport | None, review: bool) -> list[str]:
+def _divergences(spec: MethodSpec, report: VerificationReport | None, review: bool) -> list[str]:
     if not spec.divergences:
         return []
     checks = {c.divergence_id: c for c in (report.divergence_checks if report else [])}
@@ -270,7 +272,7 @@ def _divergences(spec: AlgorithmSpec, report: VerificationReport | None, review:
             evidence = _pill("did not reproduce", "bad") + " " + esc(check.note)
         found = f" Found by {_names(d.discovered_by)}." if d.discovered_by else ""
         tags = " ".join([_pill(esc(d.category.value)), _pill(f"severity {esc(d.severity.value)}", color),
-                         *(_pill(esc(e)) for e in d.engines)])
+                         *(_pill(esc(e)) for e in d.backends)])
         body = [
             f"{_raw(d.id)} #h(6pt) {tags}",
             "",
@@ -287,13 +289,13 @@ def _divergences(spec: AlgorithmSpec, report: VerificationReport | None, review:
 def _verification(report: VerificationReport | None, review_result) -> list[str]:
     if report is None:
         return []
-    engines = ", ".join(f"{_raw(e)} {esc(report.engine_versions.get(e) or '')}" for e in report.engines)
+    backends = ", ".join(f"{_raw(e)} {esc(report.backend_versions.get(e) or '')}" for e in report.backends)
     status = _pill(esc(report.status.upper()), "ok" if report.status == "pass" else "bad")
     out = [
         "== Verification",
         f"{status} {esc(report.conclusion)}",
         "",
-        f"Engines: {engines}. {len(report.runs)} runs, "
+        f"Backends: {backends}. {len(report.runs)} runs, "
         f"{sum(len(r.invariants) for r in report.runs)} invariant assertions, "
         f"{len(report.explained_differences)} difference(s) explained by declared divergences.",
         "",
@@ -311,7 +313,7 @@ def _verification(report: VerificationReport | None, review_result) -> list[str]
     return out
 
 
-def _credits(spec: AlgorithmSpec) -> list[str]:
+def _credits(spec: MethodSpec) -> list[str]:
     credits = spec.credits
     if not credits.everyone():
         return []
@@ -343,7 +345,7 @@ def _for_the_reviewer(review_result) -> list[str]:
 # --- public -----------------------------------------------------------------------
 
 
-def render(spec: AlgorithmSpec, report: VerificationReport | None = None, review_result=None) -> str:
+def render(spec: MethodSpec, report: VerificationReport | None = None, review_result=None) -> str:
     """The full entry as Typst source. Pass a `Review` to get margin notes."""
     review = review_result is not None
     lines = [_preamble(spec, review)]
@@ -371,7 +373,7 @@ def compile_available() -> bool:
 
 
 def write(
-    algorithm_id: str,
+    method_id: str,
     output_dir: str | Path = "site/typst",
     pdf: bool = False,
     verify_first: bool = True,
@@ -382,17 +384,17 @@ def write(
     `review=True` adds the open questions from `gigi review` as margin notes and
     a reviewer's checklist; the file is then named `<id>.review.typ`.
     """
-    spec = registry.load_algorithm(algorithm_id)
+    spec = registry.load_method(method_id)
     report = verify(spec) if verify_first or review else None
     review_result = None
     if review:
         from gigi.review import review as run_review
 
-        review_result = run_review(algorithm_id)
+        review_result = run_review(method_id)
 
     directory = Path(output_dir)
     directory.mkdir(parents=True, exist_ok=True)
-    stem = f"{algorithm_id}.review" if review else algorithm_id
+    stem = f"{method_id}.review" if review else method_id
 
     source = directory / f"{stem}.typ"
     source.write_text(render(spec, report, review_result), encoding="utf-8")

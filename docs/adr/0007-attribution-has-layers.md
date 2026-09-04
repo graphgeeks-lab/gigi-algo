@@ -26,7 +26,7 @@ who created the algorithm  !=  who implemented it in Gigi
                            !=  who found the divergence
 ```
 
-- `provenance:` in `algorithm.yaml` holds historical attribution — original
+- `provenance:` in `method.yaml` holds historical attribution — original
   authors, the original work, structured precursors, and `attribution_notes`
   for the parts that resist structure. Ambiguity is recorded, not resolved.
 - `gigi:` holds contribution to *this repository*, by role, as ids into

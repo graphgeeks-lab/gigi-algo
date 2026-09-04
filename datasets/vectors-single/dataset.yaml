@@ -1,0 +1,15 @@
+kind: vectors
+id: vectors-single
+description: >
+  One vector, and therefore no pairs at all. The degenerate case for a pairwise
+  measure, in the way the single-node graph is the degenerate case for a
+  centrality: the correct answer is an empty result, and a backend that returns
+  anything else is wrong.
+id_column: id
+features:
+  zero_vectors: false
+  negative_values: false
+expected:
+  vectors: 1
+  dimensions: 2
+license: CC0

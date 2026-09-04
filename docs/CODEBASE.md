@@ -1,9 +1,10 @@
 # Reading this codebase
 
-Most of Gigi is content, not code. `algorithms/`, `datasets/`, `families/` and
-`people/` are the project; `gigi/` is the machinery that reads them and runs
-them. If you are here to contribute an algorithm, you do not need this file —
-read [CONTRIBUTING.md](../CONTRIBUTING.md) instead.
+Most of Gigi is content, not code. `methods/`, `datasets/`, `problems/`,
+`families/`, `domains/`, `semantics/` and `people/` are the project; `gigi/` is
+the machinery that reads them and runs them. If you are here to contribute a
+method, you do not need this file — read [CONTRIBUTING.md](../CONTRIBUTING.md)
+instead.
 
 ## Read it in this order
 
@@ -11,34 +12,41 @@ Roughly ninety minutes, and you will have seen everything.
 
 | # | File | What you learn |
 |---|---|---|
-| 1 | `algorithms/pagerank/algorithm.yaml` | What a registry entry claims. The whole design is visible here before any Python. |
-| 2 | `algorithms/pagerank/implementations/reference.py` | What a reference implementation looks like — the oracle, and a teaching artifact. |
-| 3 | `algorithms/pagerank/implementations/networkx.py` | What an engine implementation looks like. Fifteen lines. |
-| 4 | `gigi/models.py` | Every typed object, one file, grouped by concern. Skim the class names first. |
+| 1 | `methods/pagerank/method.yaml` | What a registry entry claims. The whole design is visible here before any Python. |
+| 2 | `methods/pagerank/implementations/reference.py` | What a reference implementation looks like — the oracle, and a teaching artifact. |
+| 3 | `methods/pagerank/implementations/networkx.py` | What a backend implementation looks like. Fifteen lines. |
+| 4 | `gigi/models/spec.py` | Every typed object in a registry entry, grouped by concern. Skim the class names first. |
 | 5 | `gigi/graph.py` | The neutral data layer: Arrow in memory, CSV on disk, and a deliberately cheap profile. |
-| 6 | `gigi/registry.py` | How a directory becomes an `AlgorithmSpec`, and how families resolve. |
-| 7 | `gigi/adapters/networkx.py` | An adapter: installed? version? convert. Nothing else. |
-| 8 | `gigi/harness.py` | **The heart.** `run`, `compare`, `verify`. Read `verify` slowly — it is the argument the whole project makes. |
-| 9 | `gigi/invariants.py` | The maths, executed. |
-| 10 | `tests/test_conformance.py` | How a new algorithm gets tested without anyone writing a test. |
-| 11 | `gigi/review.py` | What a machine settles versus what a person must. |
+| 6 | `gigi/data.py` | One door in front of every fixture, whatever kind it is. Twenty lines that stop everything above it from assuming "dataset" means "graph". |
+| 7 | `gigi/registry.py` | How a directory becomes a `MethodSpec`, and how families resolve. |
+| 8 | `gigi/backends/networkx.py` | An adapter: installed? version? convert. Nothing else. |
+| 9 | `gigi/backends/base.py` | What a converted input owes the harness — including what its result is keyed by, and whether every key is owed an answer. |
+| 10 | `gigi/harness.py` | **The heart.** `run`, `compare`, `verify`. Read `verify` slowly — it is the argument the whole project makes. |
+| 11 | `gigi/invariants.py` | The maths, executed. |
+| 12 | `tests/test_conformance.py` | How a new method gets tested without anyone writing a test. |
+| 13 | `gigi/review.py` | What a machine settles versus what a person must. |
 
-Everything else — `cli/`, `site/`, `people.py`, `runstore.py`, `paths.py` — is
-plumbing you can read when you need it.
+If you want the short version of *why the schema is not graph-shaped*, read
+`methods/cosine_similarity/method.yaml` beside `methods/pagerank/method.yaml`.
+Two domains, two input kinds, two output kinds, one schema.
+
+Everything else — `cli/`, `site/`, `vectors.py`, `people.py`, `runstore.py`,
+`paths.py` — is plumbing you can read when you need it.
 
 ## The map
 
 ```
-                 algorithms/*/algorithm.yaml     the claims
-                 datasets/*/                     small adversarial graphs
-                 families/families.yaml          the taxonomy
+                 methods/*/method.yaml           the claims
+                 datasets/*/                     small adversarial fixtures
+                 problems/*.yaml                 the questions
+                 families/ · domains/            the taxonomy
                  people/people.yaml              who did the work
                           │
                           ▼
-   registry.py ──────► models.py ◄────── graph.py
-        │                  ▲                 │
-        │                  │                 ▼
-        │             invariants.py     adapters/*.py ──► the engines
+   registry.py ──────► models/ ◄─── data.py ──┬── graph.py
+        │                  ▲            │     └── vectors.py
+        │                  │            ▼
+        │             invariants.py   backends/*.py ──► the libraries
         │                  ▲                 │
         └──────────────────┴─────────────────┘
                           │
@@ -51,15 +59,16 @@ plumbing you can read when you need it.
 ```
 
 Dependencies point one way only. `models.py` imports nothing of ours;
-`graph.py` and `registry.py` know nothing about engines; adapters know nothing
+`graph.py` and `registry.py` know nothing about backends; adapters know nothing
 about verification; `harness.py` knows nothing about how results are displayed.
 If you find yourself wanting an import that points back up this diagram, the
 code is in the wrong place.
 
 ## Two buckets, and why the distinction matters
 
-**Capability** (~1,360 lines) is code that computes something nothing else can:
-models, registry, graph, adapters, harness, results, invariants, people.
+**Capability** (~2,350 lines) is code that computes something nothing else can:
+models, registry, the data layer, adapters, harness, results, invariants,
+people.
 Growth here means the system learned a new concept — and that is what the
 budget in `tests/test_readability.py` guards.
 
@@ -69,6 +78,21 @@ CLI, the static site, the review summary. It grows with what we choose to
 
 The line is not a loophole. If something in `cli/` or `site/` starts computing
 rather than formatting, it has moved buckets and belongs in the library.
+
+## Where this is going
+
+[ONTOLOGY.md](ONTOLOGY.md) describes the schema the registry grows into:
+methods and data structures as two roots meeting at *operations*, the extension
+rules that keep a general schema from becoming a useless one, and why the
+semantic layer borrows Apache OSSIE's `ai_context` rather than inventing its
+own.
+
+Some of it is built. The schema generalised in PR 1, the semantic layer landed
+in PR 2, and `cosine_similarity` — a measure over vectors, in the `similarity`
+domain — proved in PR 2b that the runtime generalised with it. Data structures
+and `operations` are not built. The v0.1 release stays graph-content-led, and
+the extension rules in that document are the ones the test suite enforces
+today, not aspirations.
 
 ## Rules the tests enforce
 

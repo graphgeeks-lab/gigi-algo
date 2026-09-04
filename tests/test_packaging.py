@@ -8,20 +8,23 @@ from __future__ import annotations
 
 import tomllib
 
-from gigi.paths import repo_root
+from gigi.paths import CONTENT_DIRECTORIES, repo_root
 
-CONTENT = ("algorithms", "datasets", "families", "people")
+# Derived, not restated. A content directory added to gigi/paths.py and
+# forgotten in pyproject.toml ships a wheel with half a registry in it, and
+# this is the only thing that would notice.
+CONTENT = CONTENT_DIRECTORIES
 
 
 def test_checkout_wins_over_packaged_content(tmp_path):
     """In a checkout, walking up finds the repository and the packaged copy is
     ignored -- so editing the registry in place keeps working."""
     repo = tmp_path / "repo"
-    (repo / "algorithms").mkdir(parents=True)
+    (repo / "methods").mkdir(parents=True)
     module = repo / "gigi" / "paths.py"
     module.parent.mkdir()
     module.write_text("", encoding="utf-8")
-    (module.parent / "_content" / "algorithms").mkdir(parents=True)
+    (module.parent / "_content" / "methods").mkdir(parents=True)
 
     assert repo_root(start=module) == repo.resolve()
 
@@ -29,7 +32,7 @@ def test_checkout_wins_over_packaged_content(tmp_path):
 def test_installed_wheel_falls_back_to_packaged_content(tmp_path):
     """With no checkout above, `gigi/_content/` is the registry."""
     site = tmp_path / "site-packages" / "gigi"
-    (site / "_content" / "algorithms").mkdir(parents=True)
+    (site / "_content" / "methods").mkdir(parents=True)
     module = site / "paths.py"
     module.write_text("", encoding="utf-8")
 

@@ -1,0 +1,386 @@
+id: connected_components
+name: Connected Components
+kind: algorithm
+aliases: [components, connected components, weakly connected components, strongly connected components]
+family: connectivity
+maturity: emerging
+
+summary: >
+  Split a graph into the groups of nodes that can reach each other.
+
+problems:
+  - component_membership
+
+ai_context:
+  instructions: >
+    The first thing to run on an unfamiliar graph, and often the last: a graph
+    that turns out to be one giant component plus isolated nodes is telling you
+    about the join, not the domain. On a directed graph, establish whether the
+    user means weak (ignore the arrows) or strong (must reach both ways) before
+    answering -- the two give different answers, neither is universally the
+    default, and libraries disagree about which one bare "connected components"
+    means. Never offer this as a way to cluster or find communities: it answers
+    whether a path exists, not where connections are concentrated.
+  synonyms:
+    - connected components
+    - is the graph connected
+    - islands
+    - disconnected parts
+    - weakly connected
+    - strongly connected
+
+# Where the algorithm came from. Separate from `gigi:` below, which records who
+# did the work in this repository. See docs/adr/0007-attribution-has-layers.md.
+provenance:
+  introduced: 1972
+
+  original_authors:
+    - name: Robert Tarjan
+      note: >
+        For the strongly connected case, which is the part with an attributable
+        origin: a single depth-first pass in linear time. The weak case is
+        breadth-first search with a loop around it and belongs to no one -- it
+        appears independently wherever anyone has needed it.
+
+  original_work:
+    title: "Depth-First Search and Linear Graph Algorithms"
+    year: 1972
+    venue: SIAM Journal on Computing 1(2), 146-160
+    doi: 10.1137/0201010
+    url: null
+
+  precursors:
+    - name: "Solution d'une question relative au jeu des labyrinthes"
+      year: 1882
+      authors: [Charles Pierre Tremaux]
+      note: >
+        Depth-first traversal as a method for exploring a maze, three centuries
+        of graph theory before there were graphs to run it on. The traversal
+        every component algorithm is built from.
+    - name: The connectivity of a graph
+      year: 1932
+      authors: [Hassler Whitney]
+      note: >
+        Connectivity established as a structural property worth studying,
+        rather than a step inside something else.
+    - name: An efficient algorithm for finding strongly connected components
+      year: 1978
+      authors: [Micha Sharir]
+      note: >
+        Independently published; the two-pass method usually credited to
+        Kosaraju, who never published it. What the reference implementation
+        here uses, because two ordinary walks can be read in a sitting and
+        Tarjan's single pass cannot.
+
+  attribution_notes: >
+    Two algorithms wearing one name, with very different histories. Weak
+    components are breadth-first search applied repeatedly -- attributable to
+    nobody, and none the worse for it. Strong components are Tarjan 1972, with
+    the Kosaraju-Sharir two-pass method as the readable alternative; Kosaraju
+    is credited for work he did not publish, which is worth knowing before
+    citing him. Cite Tarjan for strong components and cite nothing for weak
+    ones.
+
+# Who did the work in Gigi. Every id resolves against people/people.yaml.
+gigi:
+  spec_curators: [dennis-irorere]
+  reference_implementation: [dennis-irorere]
+  dataset_curators: [dennis-irorere]
+  adapter_contributors:
+    reference: [dennis-irorere]
+    networkx: [dennis-irorere]
+    igraph: [dennis-irorere]
+    rustworkx: [dennis-irorere]
+
+intent:
+  not_for:
+    - community_grouping
+    - simple_node_importance
+    - cheapest_route
+
+complexity:
+  time: O(V+E)
+  space: O(V)
+
+# The mathematics, in a form something other than a person can use. maths.md is
+# the exposition; this block is what an agent, a verifier or a citation needs.
+maths:
+  summary: >
+    The equivalence classes of the reachability relation. Two nodes are
+    together when a path joins them.
+
+  definition:
+    statement: |
+      Define u ~ v when a path joins u and v. This is an equivalence relation --
+      reflexive, symmetric, transitive -- and the connected components are its
+      equivalence classes.
+
+      Which paths count is the `mode`:
+        weak    ignore edge direction; u ~ v if any undirected path joins them
+        strong  respect it; u ~ v only if u reaches v AND v reaches u
+
+      On an undirected graph the two coincide.
+    latex: 'C(G) = V / {\sim}, \quad u \sim v \iff u \rightsquigarrow v \wedge v \rightsquigarrow u'
+    note: >
+      Stating it as a quotient by an equivalence relation is not decoration: it
+      is why the output has no meaningful labels. A quotient set has elements,
+      not names, so any labelling a backend produces is its own invention --
+      which is exactly what the comparator has to ignore.
+
+  also:
+    - statement: "The strong components of G, contracted to single nodes, form a DAG."
+      latex: 'G / {\sim_{\mathrm{strong}}} \text{ is acyclic}'
+      note: >
+        The condensation. If it had a cycle, the two components on that cycle
+        would reach each other both ways and would therefore be one component.
+        This is what `components_are_maximal` checks under `mode: strong`.
+    - statement: "Every strong component is contained in exactly one weak component."
+      latex: '\forall S \in C_{\mathrm{strong}}(G), \exists! W \in C_{\mathrm{weak}}(G) : S \subseteq W'
+      note: >
+        The strong decomposition refines the weak one, so the strong component
+        count is always at least the weak count. A backend reporting fewer
+        strong than weak components has a bug, and no fixture is needed to know
+        it.
+
+  invariants:
+    - id: components_are_connected
+      statement: Every component is connected -- each member reaches every other without leaving it.
+      check: true
+      note: >
+        Checked by an independent breadth-first walk, not by asking the backend
+        again. Half of the characterisation: on its own it is satisfied by
+        chopping the graph into single nodes.
+
+    - id: components_are_maximal
+      statement: >
+        Nothing could be merged: under `weak` no edge crosses between
+        components, and under `strong` no crossing edges form a cycle.
+      check: true
+      note: >
+        The other half, and the reason invariants can see the effective
+        parameters. Under `weak` a crossing edge means two components that
+        should have been one; under `strong` crossing edges are the point, and
+        the claim becomes that the condensation is acyclic. Together with
+        connectivity this pins the decomposition exactly -- there is no other
+        partition satisfying both.
+
+  under_determined:
+    - id: directed_mode
+      question: On a directed graph, does "connected" mean weak or strong?
+      choices:
+        - weak -- ignore the arrows
+        - strong -- must reach both ways
+        - refuse to answer until the caller says which
+      datasets: [tiny-directed, dangling-small]
+      note: >
+        The central ambiguity, and the libraries do not agree on how to handle
+        it. NetworkX and rustworkx refuse: `connected_components` raises on a
+        directed graph rather than choosing. igraph answers, defaulting to weak.
+        Gigi makes it the `mode` parameter and defaults to weak, which is the
+        more common intent -- and every adapter records which function it
+        actually called, so the choice is never invisible.
+
+    - id: undirected_strong
+      question: "What should `mode: strong` mean on an undirected graph?"
+      choices:
+        - the same as weak, because every edge already goes both ways
+        - an error, because strong connectivity is a directed notion
+      datasets: [undirected-small]
+      note: >
+        Mathematically the first: on an undirected graph the two relations are
+        identical, so igraph answering is correct rather than lax. NetworkX and
+        rustworkx raise instead -- rustworkx with a bare `TypeError` about
+        PyGraph. A disagreement about strictness, not about components, so it
+        is recorded here rather than as a divergence; Gigi's adapters route to
+        the undirected function and the question never reaches the backend.
+
+    - id: isolated_nodes
+      question: Is a node with no edges a component of its own?
+      choices:
+        - yes, a component of one
+        - no, it belongs to nothing
+      datasets: [disconnected-small, single-node]
+      note: >
+        Every backend here says yes, and the equivalence-relation definition
+        requires it -- reflexivity means every node is connected to itself. It
+        is listed because an implementation that builds components by walking
+        *edges* will silently drop isolated nodes, which is a real and common
+        bug. `disconnected-small` has node n6 precisely to catch it.
+
+    - id: self_loops_and_parallel_edges
+      question: Do self loops or duplicate edges change the components?
+      choices:
+        - no; they add no reachability that was not already there
+        - yes, if the implementation counts rather than reaches
+      datasets: [self-loop-small, duplicate-edge-small]
+      note: >
+        They cannot, under the definition: a self loop connects a node to
+        itself, which reflexivity already grants, and a parallel edge repeats a
+        path that exists. Recorded because the degree_centrality entry found
+        rustworkx counting incidences where the others counted differently, so
+        "multigraph edge cases are handled the same way everywhere" is not an
+        assumption this registry makes without a fixture.
+
+inputs:
+  - kind: graph
+    directed:
+      supported: true
+      preferred: false
+      notes: >
+        Defined on both. On a directed graph the `mode` parameter chooses
+        between weak and strong, and there is no safe default to infer.
+    weighted:
+      supported: false
+      notes: Weights are ignored. Reachability does not depend on cost.
+    negative_weights:
+      supported: false
+
+parameters:
+  - name: mode
+    type: str
+    common_default: weak
+    description: >
+      `weak` (ignore edge direction) or `strong` (must reach both ways). Gigi
+      sets weak rather than deferring to the backend, because the backends do
+      not agree on what bare "connected components" means on a directed graph --
+      two of them refuse the question entirely. Ignored on undirected graphs,
+      where the two coincide.
+
+output:
+  kind: partition
+  label_name: component
+
+comparison:
+  # Unused by the partition comparator, which has no notion of tolerance: two
+  # nodes are in the same component or they are not. Present because the schema
+  # requires it, and set to zero rather than a plausible-looking number so it
+  # cannot be read as meaning anything.
+  absolute_tolerance: 0.0
+  relative_tolerance: 0.0
+
+verification:
+  # The one ambiguous parameter pinned, so any remaining difference is semantic.
+  parameters:
+    mode: weak
+
+deterministic: true
+
+backends:
+  reference:
+    supported: true
+    notes: >
+      Breadth-first per component for weak; Kosaraju-Sharir's two passes for
+      strong, chosen over Tarjan's single pass because it can be read.
+  networkx:
+    supported: true
+    notes: >
+      Three functions. `connected_components` raises on a directed graph rather
+      than guessing, so the adapter routes by mode and direction.
+  igraph:
+    supported: true
+    notes: >
+      One function with a mode, the closest of the four to how Gigi models this.
+      Returns a membership vector rather than a list of components.
+  rustworkx:
+    supported: true
+    notes: >
+      Three functions again, and `strongly_connected_components` raises
+      TypeError on an undirected PyGraph. Returns sets of node indices.
+
+datasets:
+  - empty
+  - single-node
+  - tiny-directed
+  - dangling-small
+  - disconnected-small
+  - undirected-small
+  - weighted-small
+  - self-loop-small
+  - duplicate-edge-small
+  - road-distances-small
+
+divergences: []
+
+relationships:
+  - kind: builds_on
+    method: bfs
+    condition: >
+      The weak decomposition is breadth-first search restarted at every node
+      not yet visited.
+    note: >
+      Not a resemblance -- an identity. Weak components *are* repeated BFS, so
+      anything true of BFS's traversal order is true of how components are
+      discovered. The strong decomposition needs depth-first order specifically,
+      and BFS cannot be substituted there.
+
+semantic_interpretations:
+  - id: weights_ignored
+    subject: edge_weight
+    semantic_role: none
+    description: >
+      An edge weight column is read and then ignored entirely. Reachability is
+      a yes or no: an edge either exists or does not, and a weight of 0.001
+      connects its endpoints exactly as firmly as a weight of 1000.
+    common_domain_meanings:
+      - meaning: relationship_strength
+        fit: contextual
+        note: >
+          If weak relationships should not count as connections, this method is
+          not making that distinction -- and a single spurious weak edge is
+          enough to merge two components that have nothing to do with each
+          other. Threshold the graph first if that matters.
+      - meaning: probability
+        fit: contextual
+        note: >
+          A probabilistic graph, where each edge exists with some likelihood,
+          has a distribution over component structures rather than one. This
+          method reports the components of the graph where every edge with any
+          probability at all is certain, which is the most optimistic reading
+          available.
+
+use_cases:
+  - id: data_quality_triage
+    domain: data_engineering
+    question: >
+      Is this graph one network, or several unrelated ones stuck in a table?
+    input_mapping:
+      node: an entity
+      edge: any recorded relationship between two entities
+    method_semantics: >
+      Groups of entities joined by some chain of relationships. Sizes are the
+      useful output, not the membership: one giant component is a normal social
+      graph, and many equal-sized ones usually means the join key was wrong.
+    cautions:
+      - >
+        A single bad edge merges two components permanently, and nothing in the
+        output shows that it was one edge doing it. If two groups you expected
+        to be separate came back as one, look for the bridge before believing
+        the result.
+      - >
+        Component counts are extremely sensitive to how the graph was built.
+        Comparing counts across two extractions is comparing the extractions,
+        not the domain.
+    related_methods: []
+
+  - id: entity_resolution_clusters
+    domain: entity_resolution
+    question: >
+      Which records refer to the same real-world thing?
+    input_mapping:
+      node: a record
+      edge: a match decision between two records
+    method_semantics: >
+      Transitive closure of the match decisions. If A matches B and B matches C,
+      then A, B and C are one entity here -- whether or not anything ever
+      compared A with C.
+    cautions:
+      - >
+        Transitivity is the assumption and it is frequently false. Match scores
+        are not transitive, so a chain of weak-but-passing matches merges
+        records nobody would have matched directly. This is how a resolution
+        pipeline produces one cluster containing half the database.
+      - >
+        The fix is not in this method. Threshold the match edges first, or use a
+        clustering that can refuse to merge -- components will always take the
+        transitive closure, because that is what an equivalence relation is.
+    related_methods: []

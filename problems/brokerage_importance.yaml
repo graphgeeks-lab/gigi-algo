@@ -1,0 +1,33 @@
+id: brokerage_importance
+name: Brokerage importance
+domain: graph
+
+question: >
+  Which nodes sit between others, so that removing them would separate the
+  network?
+
+description: >
+  Rank nodes by how often they lie on the routes between other pairs of nodes.
+  A different sense of importance from endorsement: a broker may have few
+  connections and still be structurally critical, and a well-endorsed node may
+  broker nothing.
+
+input_kinds: [graph]
+output_kinds: [node_score]
+
+related_problems:
+  - recursive_node_influence
+  - simple_node_importance
+
+ai_context:
+  instructions: >
+    Choose this when the user cares about bridges, bottlenecks, gatekeepers or
+    single points of failure. No method in the registry solves it yet --
+    betweenness centrality arrives in v0.3 -- so say so rather than offering a
+    centrality that answers a different question.
+  synonyms:
+    - bridging
+    - brokerage
+    - gatekeepers
+    - bottleneck nodes
+    - who connects otherwise separate groups

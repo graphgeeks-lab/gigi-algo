@@ -19,7 +19,7 @@ from gigi.maturity import frontier_allowed, gated
 def executable_algorithms() -> list[str]:
     """Algorithms the suite may run right now."""
     return [
-        algorithm_id
-        for algorithm_id in registry.list_algorithms()
-        if frontier_allowed() or not gated(registry.load_algorithm(algorithm_id))
+        method_id
+        for method_id in registry.list_methods()
+        if frontier_allowed() or not gated(registry.load_method(method_id))
     ]

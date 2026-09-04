@@ -5,11 +5,14 @@ future agent tools call exactly these functions.
 
     import gigi
 
-    spec    = gigi.algorithm("pagerank")
-    graph   = gigi.load_graph("datasets/weighted-small")
-    profile = gigi.inspect_graph(graph)
-    result  = gigi.run("pagerank", engine="networkx", graph=graph)
+    spec    = gigi.method("pagerank")
+    data    = gigi.load_dataset("weighted-small")
+    profile = gigi.inspect(data)
+    result  = gigi.run("pagerank", "networkx", data)
     report  = gigi.verify("pagerank")
+
+`load_dataset` takes a fixture of any kind -- a graph, or the vectors a
+similarity measure consumes -- and `run` never asks which it was given.
 """
 
 from __future__ import annotations
@@ -25,42 +28,58 @@ try:
 except PackageNotFoundError:  # pragma: no cover - uninstalled checkout
     __version__ = "0.0.0+uninstalled"
 
-from gigi.adapters import available_engines, engine_versions
-from gigi.graph import GraphData, list_datasets, load_graph, profile_graph
+from gigi.backends import available_backends, backend_versions
+from gigi.data import list_datasets, load_dataset, profile_dataset
+from gigi.graph import GraphData, load_graph, profile_graph
 from gigi.harness import compare, run, verify
 from gigi.models import (
-    AlgorithmSpec,
+    MethodSpec,
     Comparison,
     GraphProfile,
+    VectorProfile,
     RunResult,
     VerificationReport,
 )
-from gigi.registry import list_algorithms, load_algorithm
+from gigi.registry import list_methods, load_method
+from gigi.vectors import VectorData
 
-# Read-aloud aliases used in the docs and by the CLI.
-algorithm = load_algorithm
-algorithms = list_algorithms
+# Read-aloud aliases. `method` is canonical now that the registry is not
+# graph-only by construction; `algorithm` stays because it is the word a
+# reader reaches for when the method happens to be one.
+method = load_method
+methods = list_methods
+algorithm = load_method
+algorithms = list_methods
 datasets = list_datasets
+inspect = profile_dataset
+# Kept: it was the v0.1 name, and a graph is still the common case.
 inspect_graph = profile_graph
 
 __all__ = [
-    "AlgorithmSpec",
+    "MethodSpec",
     "Comparison",
     "GraphData",
     "GraphProfile",
+    "VectorData",
+    "VectorProfile",
     "RunResult",
     "VerificationReport",
     "__version__",
     "algorithm",
     "algorithms",
-    "available_engines",
+    "method",
+    "methods",
+    "available_backends",
     "compare",
     "datasets",
-    "engine_versions",
+    "backend_versions",
+    "inspect",
     "inspect_graph",
-    "list_algorithms",
+    "load_dataset",
+    "profile_dataset",
+    "list_methods",
     "list_datasets",
-    "load_algorithm",
+    "load_method",
     "load_graph",
     "profile_graph",
     "run",

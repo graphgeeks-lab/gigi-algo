@@ -1,0 +1,412 @@
+id: cosine_similarity
+name: Cosine Similarity
+kind: measure
+aliases: [cosine, cosine distance, angular similarity]
+family: vector-similarity
+maturity: emerging
+
+summary: >
+  Score how alike two vectors are by the angle between them, ignoring how long
+  either one is.
+
+problems:
+  - pairwise_vector_similarity
+
+ai_context:
+  instructions: >
+    The default similarity measure for embeddings and for text, and the right
+    one whenever magnitude is an artefact rather than a signal. Say what it
+    discards: two vectors pointing the same way score 1 no matter how long
+    either is, so a document of ten words and one of ten thousand on the same
+    topic are identical here. If length, volume or amount is part of what makes
+    two things similar, recommend a distance instead. Never present a cosine
+    score for a pair involving a zero vector -- the angle is undefined, and the
+    libraries disagree about what to return.
+  synonyms:
+    - how similar are these vectors
+    - cosine
+    - embedding similarity
+    - angle between vectors
+    - semantic similarity
+
+# Where the measure came from. Separate from `gigi:` below, which records who
+# did the work in this repository. See docs/adr/0007-attribution-has-layers.md.
+provenance:
+  introduced: 1975
+
+  original_authors:
+    - name: Gerard Salton
+      note: >
+        Not the inventor of the cosine, which is classical geometry. What
+        Salton's group contributed was the representation that makes the angle
+        mean something: documents as vectors in a term space, so that
+        similarity of content becomes closeness of direction.
+    - name: A. Wong
+    - name: C. S. Yang
+
+  original_work:
+    title: "A Vector Space Model for Automatic Indexing"
+    year: 1975
+    venue: Communications of the ACM 18(11), 613-620
+    doi: 10.1145/361219.361220
+    url: null
+
+  precursors:
+    - name: Cauchy-Schwarz inequality
+      year: 1888
+      authors: [Augustin-Louis Cauchy, Hermann Amandus Schwarz]
+      note: >
+        The reason the measure is bounded at all. |<x, y>| <= ||x|| ||y|| is
+        exactly the statement that the cosine lies in [-1, 1], so the invariant
+        this entry checks on every run is a nineteenth-century theorem rather
+        than a convention.
+    - name: "Distribution de la flore alpine dans le Bassin des Dranses"
+      year: 1901
+      authors: [Paul Jaccard]
+      note: >
+        An earlier similarity coefficient, over sets rather than vectors.
+        Different measure, same job, and a useful reminder that "how alike are
+        these two things" has been formalised many times and never once in a
+        way that suits every question.
+    - name: The SMART Retrieval System
+      year: 1971
+      authors: [Gerard Salton]
+      note: >
+        The system the vector space model came out of. Cosine ranking was in
+        use there before the 1975 paper stated it as a model.
+
+  attribution_notes: >
+    Cite Salton, Wong and Yang for the vector space model, not for the cosine.
+    The measure itself is the geometric definition of an angle, and it appears
+    independently in statistics as the uncentred correlation coefficient and in
+    signal processing as normalised correlation. What is genuinely attributable
+    is the decision to represent documents as vectors so that the angle between
+    them answers a retrieval question -- and that decision, not the arithmetic,
+    is what a user is inheriting when they choose this measure.
+
+# Who did the work in Gigi. Every id resolves against people/people.yaml.
+gigi:
+  spec_curators: [dennis-irorere]
+  reference_implementation: [dennis-irorere]
+  dataset_curators: [dennis-irorere]
+  adapter_contributors:
+    reference: [dennis-irorere]
+    scipy: [dennis-irorere]
+    sklearn: [dennis-irorere]
+
+intent:
+  not_for:
+    - recursive_node_influence
+    - simple_node_importance
+
+complexity:
+  time: O(n^2 d)
+  space: O(n^2)
+
+# The mathematics, in a form something other than a person can use. maths.md is
+# the exposition; this block is what an agent, a verifier or a citation needs.
+maths:
+  summary: >
+    The dot product of two vectors divided by the product of their lengths,
+    which is the cosine of the angle between them.
+
+  definition:
+    statement: |
+      cos(x, y) = <x, y> / (||x|| ||y||)
+
+      <x, y> is the dot product, sum over i of x_i * y_i, and ||x|| is the
+      Euclidean norm, sqrt(<x, x>). Defined only when both norms are non-zero.
+    latex: '\cos(x, y) = \frac{x \cdot y}{\|x\| \, \|y\|}'
+    note: >
+      The division by the norms is the whole measure. Without it this is the
+      dot product, which grows with the length of either vector; with it, only
+      direction survives.
+
+  also:
+    - statement: "cos(x, y) = <x / ||x||, y / ||y||>"
+      latex: '\cos(x, y) = \frac{x}{\|x\|} \cdot \frac{y}{\|y\|}'
+      note: >
+        Normalise first, then take the dot product. Algebraically identical and
+        numerically different: this is the form every library actually
+        computes, and it is why a zero vector is a division by zero rather than
+        a 0/0.
+    - statement: "cosine_distance(x, y) = 1 - cos(x, y)"
+      latex: 'd_{\cos}(x, y) = 1 - \cos(x, y)'
+      note: >
+        The distance form, which is what SciPy returns. Not a metric -- it
+        violates the triangle inequality -- so anything that assumes a metric
+        space (some clustering, some indexing structures) is assuming something
+        this does not provide.
+    - statement: "cos(a x, b y) = cos(x, y) for any a, b > 0"
+      latex: '\cos(\alpha x, \beta y) = \cos(x, y), \quad \alpha, \beta > 0'
+      note: >
+        Scale invariance, stated as an equation because it is the property
+        people are choosing when they choose this measure -- and the one they
+        regret when magnitude mattered after all.
+
+  invariants:
+    - id: scores_in_signed_unit_interval
+      statement: "-1 <= cos(x, y) <= 1 for every pair"
+      latex: '-1 \leq \cos(x, y) \leq 1'
+      check: true
+      note: >
+        Cauchy-Schwarz, executed. A score outside the interval is not a
+        rounding problem, it is a broken normalisation.
+
+    - id: scores_finite
+      statement: No score is NaN or infinite.
+      check: true
+      note: >
+        The check that catches the zero-vector case. A backend that answers
+        0/0 with NaN fails here rather than silently poisoning whatever sorts
+        the results.
+
+    - id: keys_are_canonical_pairs
+      statement: Every result key names one unordered pair, in sorted `a|b` form.
+      check: true
+      note: >
+        The measure is symmetric, so cos(x, y) and cos(y, x) are one answer
+        rather than two. Emitting both is not a wrong number, it is a result
+        nothing downstream can join on.
+
+  under_determined:
+    - id: zero_vector
+      question: What is the cosine of a pair when one vector is all zeros?
+      choices:
+        - undefined; decline to answer, because 0/0 is not a number
+        - 0.0, treating a zero vector as orthogonal to everything
+        - NaN, propagating the division by zero
+        - 1.0 when both vectors are zero, on the grounds that they are identical
+      divergences: [scipy-cosine-zero-vector-nan, sklearn-cosine-zero-vector-is-zero]
+      datasets: [vectors-with-zero]
+      note: >
+        A zero vector has no direction, so the angle to it does not exist. Every
+        library meets this and every library invents a different answer. Gigi
+        makes it the `zero_vector_policy` parameter: unset means "whatever the
+        backend does", which is how the divergence is observed, and verification
+        pins it so the backends can be compared on everything else.
+
+    - id: self_pairs
+      question: Does the result include the similarity of each item with itself?
+      choices:
+        - no; a pairwise result is over distinct unordered pairs
+        - yes, as a diagonal of ones
+      datasets: [vectors-small]
+      note: >
+        cos(x, x) = 1 for any non-zero x, so a diagonal carries no information
+        and doubles the result on large inputs. scikit-learn returns the full
+        matrix including the diagonal; Gigi's output kind is pairs, so the
+        adapter drops it. Recorded here because it is a choice, not a fact.
+
+    - id: pair_ordering
+      question: Is cos(x, y) reported separately from cos(y, x)?
+      choices:
+        - no; the measure is symmetric, so one key per unordered pair
+        - yes, as a full square matrix
+      datasets: [vectors-small]
+      note: >
+        Symmetry means the two are the same number. Gigi keys results by the
+        sorted pair and asserts it as an invariant, so a backend that disagrees
+        is caught rather than accommodated.
+
+inputs:
+  - kind: vectors
+    numeric: true
+    sparse:
+      supported: false
+      notes: >
+        Dense only for now. The measure is defined identically on sparse
+        vectors and the fixtures are small; a sparse representation is a data
+        structure question, and belongs with the structures work rather than
+        here.
+    zero_vectors:
+      supported: true
+      notes: >
+        Accepted, but the result for any pair involving one is governed by
+        `zero_vector_policy` -- the definition does not decide it.
+    same_length_required: true
+
+parameters:
+  - name: zero_vector_policy
+    type: str
+    common_default: null
+    description: >
+      What to do with a pair whose cosine is undefined because one of the
+      vectors is all zeros. Unset means the backend's own behaviour, which is
+      what diverges: SciPy returns NaN, scikit-learn returns 0.0, and the
+      reference declines the pair. Set to `undefined` to make every backend
+      decline it, which is what verification pins.
+
+output:
+  kind: similarity_score
+  score_name: cosine_similarity
+
+comparison:
+  absolute_tolerance: 1.0e-12
+  relative_tolerance: 1.0e-12
+
+verification:
+  # The one ambiguous parameter pinned, so any remaining difference is
+  # semantic. Tolerance is tight because there is nothing iterative here: two
+  # correct implementations of a dot product over four numbers should agree to
+  # very nearly the last bit.
+  parameters:
+    zero_vector_policy: undefined
+
+deterministic: true
+
+backends:
+  reference:
+    supported: true
+    notes: One dot product and two norms per pair, in plain Python.
+  scipy:
+    supported: true
+    notes: >
+      scipy.spatial.distance.pdist(metric="cosine"), subtracted from one.
+      Returns the condensed upper triangle, in the same pair order Gigi keys by.
+  sklearn:
+    supported: true
+    notes: >
+      sklearn.metrics.pairwise.cosine_similarity, which returns the full square
+      matrix; the adapter takes the upper triangle and drops the diagonal.
+  networkx:
+    supported: false
+    notes: Takes a graph, not vectors.
+  igraph:
+    supported: false
+    notes: Takes a graph, not vectors.
+  rustworkx:
+    supported: false
+    notes: Takes a graph, not vectors.
+
+datasets:
+  - vectors-small
+  - vectors-with-zero
+  - vectors-single
+
+divergences:
+  - id: scipy-cosine-zero-vector-nan
+    category: semantic
+    severity: high
+    backends: [scipy]
+    summary: >
+      On a pair involving a zero vector, `1 - pdist(X, "cosine")` returns NaN:
+      the normalisation divides by a zero norm and nothing guards it. The
+      reference declines the pair instead, so the two results disagree about
+      which pairs have an answer at all.
+    consequence: >
+      NaN propagates. On vectors-with-zero two of the three pairs come back NaN,
+      and anything that then sorts, averages or thresholds the scores gets NaN
+      back, usually far from where it was introduced. This is the same failure
+      mode as the rustworkx singleton, in a different library and a different
+      domain, which is the argument for checking finiteness on every run rather
+      than per method.
+    discovered_by: [dennis-irorere]
+    reported: "2026-09-04"
+    detect:
+      datasets: [vectors-with-zero]
+      backends: [reference, scipy]
+      parameters: {zero_vector_policy: null}
+      expect: differ
+
+  - id: sklearn-cosine-zero-vector-is-zero
+    category: semantic
+    severity: medium
+    backends: [sklearn]
+    summary: >
+      On a pair involving a zero vector, `cosine_similarity` returns 0.0 rather
+      than declining: its normaliser leaves an all-zero row as all zeros, so the
+      dot product is zero and the pair is reported as orthogonal.
+    consequence: >
+      Quieter than the NaN and worse for it. A zero vector -- an empty document,
+      a record with no features, a failed embedding -- is reported as *known to
+      be dissimilar* to everything, when the truth is that nothing is known
+      about it. Anything ranking by similarity will place it at the bottom
+      rather than excluding it, and no error is ever raised.
+    discovered_by: [dennis-irorere]
+    reported: "2026-09-04"
+    detect:
+      datasets: [vectors-with-zero]
+      backends: [reference, sklearn]
+      parameters: {zero_vector_policy: null}
+      expect: differ
+
+relationships:
+  - kind: alternative_to
+    method: euclidean_distance
+    note: >
+      The same pair of vectors, and the opposite decision about magnitude.
+      Cosine keeps direction and discards length; Euclidean distance keeps both
+      and is therefore sensitive to scaling that cosine ignores. On vectors
+      normalised to unit length the two are monotonically related, so the
+      ranking is identical and only the numbers differ -- which is worth knowing
+      before switching between them.
+
+semantic_interpretations:
+  - id: magnitude_discarded
+    subject: vector_magnitude
+    semantic_role: none
+    description: >
+      The length of each vector is divided out before anything is compared. A
+      vector twice as long as another, pointing the same way, is identical to it
+      here. That is the point of the measure and the most common way it is
+      misapplied.
+    common_domain_meanings:
+      - meaning: count
+        fit: contextual
+        note: >
+          Counts carry their total in their magnitude -- document length, basket
+          size, event volume. Cosine removes it, which is right when the totals
+          are incidental and wrong when they are the signal. If a user cares
+          that one thing is bigger than another, this measure has already
+          thrown that away.
+      - meaning: probability
+        fit: contextual
+        note: >
+          A probability vector already sums to one, so normalising by the
+          Euclidean norm rescales it a second time and by a different constant.
+          The result is still a valid similarity, but it is no longer comparing
+          distributions in any sense a statistician would recognise -- use a
+          divergence if that is what is meant.
+
+use_cases:
+  - id: document_similarity
+    domain: information_retrieval
+    question: >
+      Which of these documents are about the same thing?
+    input_mapping:
+      vector: term frequencies or an embedding of one document
+      dimension: a term, or a latent dimension of the embedding
+    method_semantics: >
+      The angle between two documents' term vectors. Length -- how much was
+      written -- is removed, so a paragraph and a book on the same subject
+      score alike.
+    cautions:
+      - >
+        An empty or failed-to-embed document is a zero vector. Depending on the
+        backend it comes back as NaN or as 0.0, and the second is worse: it
+        reads as "definitely unrelated" rather than "no answer".
+      - >
+        Raw term counts make common words dominate the angle. Weighting (tf-idf
+        or similar) is not part of this measure, and skipping it is the most
+        common reason cosine "does not work" on text.
+    related_methods: []
+
+  - id: embedding_nearest_neighbours
+    domain: machine_learning
+    question: >
+      Which stored items are closest to this one in embedding space?
+    input_mapping:
+      vector: a model's embedding of one item
+      dimension: one coordinate of the embedding space
+    method_semantics: >
+      Direction in the embedding space, which is what most models are trained to
+      make meaningful. Magnitude in an embedding is usually an artefact of the
+      architecture rather than a claim about the item.
+    cautions:
+      - >
+        Cosine over unnormalised embeddings and Euclidean distance over
+        normalised ones give the same ranking. If a pipeline normalises and then
+        uses cosine, one of the two steps is doing nothing -- worth knowing
+        before optimising either.
+    related_methods: []

@@ -24,8 +24,8 @@ class Links:
     person: str
     index: str
 
-    def to_algorithm(self, algorithm_id: str) -> str:
-        return self.algorithm.format(id=algorithm_id)
+    def to_algorithm(self, method_id: str) -> str:
+        return self.algorithm.format(id=method_id)
 
     def to_person(self, person_id: str) -> str:
         return self.person.format(id=person_id)

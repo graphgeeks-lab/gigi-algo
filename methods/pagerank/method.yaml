@@ -1,0 +1,461 @@
+id: pagerank
+name: PageRank
+kind: algorithm
+aliases: [Page Rank, PR]
+family: centrality
+maturity: stable
+
+summary: >
+  Rank nodes by recursive influence, where a node is important when important
+  nodes point at it.
+
+# The questions this answers, as ids into problems/. The method's own words are
+# above; the question belongs to the problem, which other methods also answer.
+problems:
+  - recursive_node_influence
+
+ai_context:
+  instructions: >
+    Rank by endorsement flowing through a network. Before recommending it,
+    check what the user means by "important": if they mean the number of
+    connections, degree centrality is cheaper and answers that; if they mean
+    bridging or gatekeeping, neither is right. If the graph has an edge column
+    that is not a strength -- distance, cost, duration -- PageRank will read it
+    backwards, and `gigi why --graph` will say so.
+  synonyms:
+    - recursive influence ranking
+    - link importance
+    - authority ranking
+    - who is influential here
+    - most influential accounts
+
+# Where the algorithm came from. Separate from `gigi:` below, which records who
+# did the work in this repository. See docs/adr/0007-attribution-has-layers.md.
+provenance:
+  introduced: 1998
+
+  original_authors:
+    - name: Lawrence Page
+    - name: Sergey Brin
+    - name: Rajeev Motwani
+    - name: Terry Winograd
+
+  original_work:
+    title: "The PageRank Citation Ranking: Bringing Order to the Web"
+    year: 1998
+    venue: Stanford InfoLab Technical Report 1999-66
+    doi: null
+    url: http://ilpubs.stanford.edu:8090/422/
+
+  precursors:
+    - name: Katz centrality
+      year: 1953
+      authors: [Leo Katz]
+      method_id: katz_centrality
+      note: >
+        A status index that already sums damped contributions over paths of
+        every length -- the recursive structure PageRank inherits.
+    - name: Eigenvector centrality
+      year: 1972
+      authors: [Phillip Bonacich]
+      method_id: eigenvector_centrality
+      note: Status as the principal eigenvector of the adjacency matrix.
+    - name: Citation influence for journal aggregates
+      year: 1976
+      authors: [Gabriel Pinski, Francis Narin]
+      note: >
+        Journal influence weights computed by normalising citations by
+        outgoing reference count -- structurally close to PageRank, two
+        decades earlier, in bibliometrics rather than web search.
+
+  attribution_notes: >
+    "PageRank" names a specific 1998 formulation, not the invention of
+    recursive link-based ranking, which is older. Related web-ranking work
+    was published or filed around the same time and independently: Massimo
+    Marchiori's Hyper Search (1997), and Robin Li's RankDex, patented in the
+    United States in 1999 from a 1996 design. The dangling-node treatment and
+    the damping factor of 0.85 are conventions from the original paper rather
+    than results, and both are places where implementations quietly differ --
+    see the divergences below.
+
+# Who did the work in Gigi. Every id resolves against people/people.yaml.
+gigi:
+  stewards: [dennis-irorere]
+  spec_curators: [dennis-irorere]
+  reference_implementation: [dennis-irorere]
+  verifier_authors: [dennis-irorere]
+  dataset_curators: [dennis-irorere]
+  adapter_contributors:
+    reference: [dennis-irorere]
+    networkx: [dennis-irorere]
+    igraph: [dennis-irorere]
+    rustworkx: [dennis-irorere]
+
+intent:
+  # Named as problems rather than prose, so `gigi why` can print the questions
+  # this method does not answer instead of a vague disclaimer.
+  not_for:
+    - simple_node_importance
+    - brokerage_importance
+    - cheapest_route
+
+complexity:
+  time: O(k(V+E))
+  space: O(V)
+
+# The mathematics, in a form something other than a person can use. maths.md is
+# the exposition; this block is what an agent, a verifier or a citation needs.
+# See docs/adr/0008-machine-readable-first.md.
+maths:
+  summary: >
+    The stationary distribution of a random surfer who follows an outgoing edge
+    with probability d and teleports to a uniformly random node otherwise.
+
+  definition:
+    statement: |
+      r(v) = (1 - d)/N  +  d * ( D/N + SUM over u -> v of  r(u) * w(u,v) / W(u) )
+
+      N is the node count, d the damping factor, W(u) the total outgoing weight
+      of u, and D the total rank held by nodes with no outgoing edges.
+    latex: |
+      r(v) = \frac{1-d}{N} + d\left( \frac{D}{N}
+             + \sum_{u \to v} \frac{r(u)\, w(u,v)}{W(u)} \right)
+    note: >
+      The D/N term is the dangling-mass repair. Without it the scores drain
+      into the sinks and stop summing to one; with it, uniform redistribution
+      is a convention rather than a consequence.
+
+  also:
+    - statement: "r = (1 - d)/N * 1 + d * M^T r, with M the row-stochastic transition matrix"
+      latex: 'r = \frac{1-d}{N}\mathbf{1} + d\,M^{\top} r'
+      note: >
+        The matrix form, which makes the link to eigenvector centrality
+        explicit: r is the dominant eigenvector of the Google matrix.
+
+  # Checked on every run, on every backend, on every fixture. An invariant id
+  # must name a check in gigi/invariants.py or the test suite fails.
+  invariants:
+    - id: scores_sum_to_one
+      statement: "SUM over v of r(v) = 1"
+      latex: '\sum_{v} r(v) = 1'
+      check: true
+      tolerance: 1.0e-6
+      note: >
+        Holds only because dangling mass is redistributed. This invariant is
+        what would catch a backend that dropped it.
+
+    - id: scores_non_negative
+      statement: "r(v) >= 0 for every v"
+      latex: 'r(v) \geq 0 \quad \forall v'
+      check: true
+
+    - id: scores_in_unit_interval
+      statement: "0 <= r(v) <= 1 for every v"
+      latex: '0 \leq r(v) \leq 1'
+      check: true
+      note: Follows from the two above, and cheap enough to assert directly.
+
+    - id: scores_finite
+      statement: No score is NaN or infinite.
+      check: true
+
+  # Where the definition leaves a choice open. Divergences record where backends
+  # *did* differ; these record where they *could*, which is what lets a new
+  # backend be assessed before it is ever run.
+  under_determined:
+    - id: dangling_mass
+      question: Where does rank held by a node with no outgoing edges go?
+      choices:
+        - redistribute uniformly over all nodes (the original paper)
+        - redistribute according to the teleport vector
+        - discard it and renormalise afterwards
+        - treat sinks as self-looping
+      datasets: [dangling-small]
+      note: >
+        Measured: all four backends redistribute uniformly. That agreement is a
+        result, not an assumption -- see notes.md.
+
+    - id: weight_semantics
+      question: Are edge weights used at all, and under what attribute name?
+      choices:
+        - ignore weights unless explicitly asked (igraph, rustworkx)
+        - use an attribute called "weight" if one exists (networkx)
+        - require the caller to name the column
+      divergences: [networkx-weight-default]
+      datasets: [weighted-small]
+
+    - id: convergence_criterion
+      question: When has power iteration converged, and what exactly is measured?
+      choices:
+        - L1 change below a tolerance
+        - L1 change below N times a tolerance (networkx)
+        - solve the linear system directly and do not iterate (igraph PRPACK)
+      note: >
+        Determines how far apart two correct implementations may legitimately
+        be, and is why comparison.absolute_tolerance is 1e-6 rather than 0.
+
+    - id: undirected_handling
+      question: What does PageRank mean on an undirected graph?
+      choices:
+        - treat each edge as two arcs
+        - refuse to run
+      divergences: [rustworkx-directed-only]
+      datasets: [undirected-small]
+
+inputs:
+  - kind: graph
+    directed:
+      supported: true
+      preferred: true
+      notes: Defined for undirected graphs too, by treating each edge as a pair of arcs.
+    weighted:
+      supported: true
+    negative_weights:
+      supported: false
+      notes: Negative weights break the stochastic interpretation of the transition matrix.
+
+parameters:
+  - name: damping
+    type: float
+    common_default: 0.85
+    description: Probability of following an edge rather than teleporting. Every backend agrees on 0.85.
+
+  - name: tolerance
+    type: float
+    common_default: null
+    description: >
+      Convergence threshold. Left unset by default because backends disagree
+      about both the value and what it measures; unset means "use the backend's
+      own default", and Gigi records what that turned out to be.
+
+  - name: max_iterations
+    type: int
+    common_default: null
+    description: Iteration cap. Unset means the backend's own default.
+
+  - name: weight_property
+    type: str
+    common_default: null
+    semantic_role: strength
+    interpretation:
+      higher_means: stronger
+      note: >
+        A larger value makes the transition along that edge more likely, so
+        mass flows preferentially down heavy edges.
+    description: >
+      Tri-state. null means "let the backend decide", which is where backends
+      differ most sharply. false means explicitly unweighted. A string names
+      the edge column to use.
+
+output:
+  kind: node_score
+  score_name: pagerank
+
+comparison:
+  absolute_tolerance: 1.0e-6
+  relative_tolerance: 1.0e-5
+
+verification:
+  # Conditions under which the backends are required to agree. Anything the
+  # backends disagree about by default is pinned here, so that a remaining
+  # difference is semantic rather than a difference of defaults.
+  parameters:
+    tolerance: 1.0e-12
+    max_iterations: 500
+
+deterministic: true
+
+backends:
+  reference:
+    supported: true
+    notes: Power iteration to 1e-12; dangling rank redistributed uniformly.
+  networkx:
+    supported: true
+    notes: nx.pagerank, power iteration, weight="weight" by default.
+  igraph:
+    supported: true
+    notes: PRPACK direct solver; no iteration tolerance to configure.
+  rustworkx:
+    supported: true
+    notes: Power iteration; weights only via an explicit weight_fn.
+
+datasets:
+  - empty
+  - single-node
+  - tiny-directed
+  - dangling-small
+  - disconnected-small
+  - weighted-small
+  - road-distances-small
+  - self-loop-small
+  - duplicate-edge-small
+  - undirected-small
+
+divergences:
+  - id: networkx-weight-default
+    category: default
+    severity: high
+    backends: [networkx, igraph, rustworkx]
+    summary: >
+      Asked for PageRank with no parameters, NetworkX runs weighted PageRank
+      whenever the graph carries an edge attribute called "weight", because
+      weight="weight" is its default. igraph and rustworkx run unweighted
+      PageRank on the same graph, because their defaults ignore weights.
+    consequence: >
+      The same call on the same graph answers a different question depending on
+      the backend, silently and without a warning. On weighted-small the scores
+      differ by 49% relative; on a graph where weights encode transaction value
+      rather than importance, the ranking is simply wrong.
+    discovered_by: [dennis-irorere]
+    reported: "2026-09-03"
+    detect:
+      datasets: [weighted-small]
+      backends: [reference, networkx]
+      parameters: {}
+      expect: differ
+
+  - id: rustworkx-directed-only
+    category: unsupported
+    severity: medium
+    backends: [rustworkx]
+    summary: >
+      rustworkx implements PageRank for PyDiGraph only. Called on an undirected
+      graph it raises TypeError rather than treating each edge as a pair of
+      arcs, which is what NetworkX, igraph and the reference implementation do.
+    consequence: >
+      A backend-selection rule that only checks "is PageRank supported" will
+      pick rustworkx for an undirected graph and fail at execution time.
+      Support is a property of the algorithm and the graph together, never of
+      the algorithm alone.
+    discovered_by: [dennis-irorere]
+    reported: "2026-09-03"
+    detect:
+      datasets: [undirected-small]
+      backends: [reference, rustworkx]
+      parameters: {}
+      expect: error
+
+# Typed edges to other algorithms. "see also" tells an agent nothing it can act
+# on; "generalises eigenvector centrality, and coincides with it when damping is
+# 1 on a strongly connected graph" tells it when a substitution is legitimate.
+relationships:
+  - kind: alternative_to
+    method: degree_centrality
+    note: >
+      Degree counts endorsements; PageRank weights each by the importance of
+      whoever gave it. Degree is the baseline PageRank has to beat, and it is
+      worth running first: on many graphs the two agree about the top nodes,
+      and when they disagree that disagreement is the finding.
+
+  - kind: generalizes
+    method: eigenvector_centrality
+    condition: >
+      As damping approaches 1 on a strongly connected, aperiodic graph,
+      PageRank converges to eigenvector centrality.
+    note: >
+      PageRank is eigenvector centrality on a damped, row-stochastic transition
+      matrix. Damping is what makes it defined on graphs that are neither
+      strongly connected nor aperiodic, which is most real graphs.
+
+  - kind: alternative_to
+    method: hits
+    note: >
+      Both rank by recursive endorsement. HITS splits the notion into hubs and
+      authorities and computes them per query; PageRank returns one score per
+      node for the whole graph.
+
+  - kind: alternative_to
+    method: katz_centrality
+    note: >
+      Katz sums damped contributions over all paths without normalising by
+      out-degree, so a node with many outgoing edges passes on more total
+      influence rather than dividing it.
+
+  - kind: alternative_to
+    method: betweenness_centrality
+    note: >
+      A different sense of "important": PageRank measures endorsement,
+      betweenness measures brokerage. Choosing between them is a question about
+      the domain, not about the graph.
+
+# How this method reads its input. Half of a semantic conflict check: the
+# other half is what the value means in the user's data, which `gigi why`
+# infers from the column or reads from an OSSIE semantic model.
+semantic_interpretations:
+  - id: weighted_edge_strength
+    subject: edge_weight
+    semantic_role: strength
+    higher_means: stronger
+    description: >
+      A larger edge value produces a stronger transition probability, so more
+      of a node's rank flows along it. PageRank has no notion of an edge being
+      expensive or long: every weight is read as affinity.
+    common_domain_meanings:
+      - meaning: relationship_strength
+        fit: strong
+        note: >
+          What the model assumes: interaction counts, affinity scores,
+          endorsement weights.
+
+      - meaning: transaction_amount
+        fit: contextual
+        note: >
+          Defensible, and a real modelling choice rather than a mistake: it
+          says a larger payment is a stronger relationship. Say so explicitly,
+          because the unweighted answer is a different and equally reasonable
+          question.
+
+      - meaning: distance
+        fit: dangerous
+        note: >
+          Backwards. A 100 km edge would be read as a hundred times stronger
+          than a 1 km edge, when it is the weaker connection. Invert or
+          transform first, or run unweighted.
+
+      - meaning: cost
+        fit: dangerous
+        note: >
+          Backwards, for the same reason as distance: expensive is not strong.
+
+      - meaning: duration
+        fit: dangerous
+        note: Backwards; a slower link is not a stronger one.
+
+use_cases:
+  - id: transaction_network_influence
+    domain: fraud_analytics
+    question: >
+      Which accounts receive recursive influence through transaction
+      relationships?
+    input_mapping:
+      node: account
+      edge: transaction
+      weight: transaction_amount
+    method_semantics: >
+      Weighted PageRank reads a larger transaction amount as a stronger
+      transition, so rank flows preferentially along high-value payments.
+    cautions:
+      - >
+        This is not topology-only influence. An account with one enormous
+        payment can outrank an account with many small ones, which may or may
+        not be what an investigation wants.
+      - >
+        NetworkX picks the weight column up by default, so the weighted answer
+        is what you get whether or not you asked for it.
+    related_methods:
+      - degree_centrality
+
+  - id: web_page_ranking
+    domain: information_retrieval
+    question: >
+      Which pages are authoritative, given who links to them?
+    input_mapping:
+      node: page
+      edge: hyperlink
+    method_semantics: >
+      The original use. Unweighted: a link is a link, and authority comes from
+      who is doing the linking.
+    cautions:
+      - >
+        Assumes links are endorsements. On a corpus where linking is
+        adversarial or automatic, the assumption fails before the maths does.

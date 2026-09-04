@@ -7,10 +7,10 @@ live in `sections.py`; the shell and primitives live in `html.py`.
 from __future__ import annotations
 
 from gigi import people, registry
-from gigi.adapters import engine_versions
-from gigi.graph import list_datasets, load_graph, profile_graph
-from gigi.models import AlgorithmSpec, VerificationReport
-from gigi.site.html import FROM_ALGORITHM, FROM_INDEX, FROM_PERSON, Links, esc, status_pill, table
+from gigi.backends import backend_versions
+from gigi.data import describe, list_datasets, load_dataset, profile_dataset
+from gigi.models import MethodSpec, VerificationReport
+from gigi.site.html import FROM_ALGORITHM, FROM_INDEX, Links, esc, status_pill, table
 from gigi.site.sections import (
     credits_section,
     discovered_by,
@@ -22,12 +22,12 @@ from gigi.site.sections import (
 )
 
 def index_body(
-    specs: list[AlgorithmSpec],
+    specs: list[MethodSpec],
     reports: dict[str, VerificationReport],
     links: Links = FROM_INDEX,
 ) -> str:
-    """The registry front page: algorithms, families, fixtures, engines, people."""
-    installed = engine_versions()
+    """The registry front page: algorithms, families, fixtures, backends, people."""
+    installed = backend_versions()
     rows = []
     for spec in specs:
         report = reports.get(spec.id)
@@ -37,7 +37,7 @@ def index_body(
                 f'<a href="{esc(href)}"><code>{esc(spec.id)}</code></a>',
                 esc(spec.family),
                 f'<span class="pill">{esc(spec.maturity.value)}</span>',
-                ", ".join(f"<code>{esc(e)}</code>" for e in registry.implemented_engines(spec.id)),
+                ", ".join(f"<code>{esc(e)}</code>" for e in registry.implemented_backends(spec.id)),
                 str(len(spec.divergences)),
                 status_pill(report.status) if report else "-",
             ]
@@ -45,16 +45,16 @@ def index_body(
 
     dataset_rows = []
     for dataset_id in list_datasets():
-        graph = load_graph(dataset_id)
-        profile = profile_graph(graph)
-        features = [name for name, on in graph.metadata.features.items() if on] or ["plain"]
+        data = load_dataset(dataset_id)
+        profile = profile_dataset(data)
+        features = [name for name, on in data.metadata.features.items() if on] or ["plain"]
         dataset_rows.append(
             [
                 f"<code>{esc(dataset_id)}</code>",
-                str(profile.node_count),
-                str(profile.edge_count),
+                esc(profile.kind),
+                esc(describe(profile)),
                 ", ".join(f"<code>{esc(f)}</code>" for f in features),
-                esc(graph.metadata.description.strip()),
+                esc(data.metadata.description.strip()),
             ]
         )
 
@@ -66,11 +66,11 @@ def index_body(
     return f"""
 <h1>Gigi</h1>
 <p class="lede">The same named graph algorithm can return different answers on
-different engines, because defaults and semantics differ. Gigi writes those
+different backends, because defaults and semantics differ. Gigi writes those
 differences down, then runs them to prove they are real.</p>
 
 <h2>Algorithms</h2>
-{table(["algorithm", "family", "maturity", "engines", "divergences", "verification"], rows)}
+{table(["algorithm", "family", "maturity", "backends", "divergences", "verification"], rows)}
 
 <h2>Families</h2>
 <p class="lede">A family is a question, not a label. An algorithm belongs to one
@@ -81,10 +81,10 @@ choosing within it rather than merely filing things.</p>
 <h2>Adversarial fixtures</h2>
 <p class="lede">Small, deterministic graphs chosen because each one puts pressure
 on a specific semantic decision.</p>
-{table(["dataset", "nodes", "edges", "features", "why it exists"], dataset_rows)}
+{table(["dataset", "kind", "shape", "features", "why it exists"], dataset_rows)}
 
-<h2>Engines in this build</h2>
-{table(["engine", "version"], engine_rows)}
+<h2>Backends in this build</h2>
+{table(["backend", "version"], engine_rows)}
 
 <h2>People</h2>
 <p class="lede">Who did the work here. Separate from who created the algorithms,
@@ -97,7 +97,7 @@ def families_table(links: Links) -> str:
     """The taxonomy, one row per family."""
     rows = []
     for family in registry.list_families():
-        members = registry.algorithms_in_family(family.id)
+        members = registry.methods_in_family(family.id)
         parent = registry.load_family(family.parent).name if family.parent else ""
         rows.append(
             [
@@ -133,13 +133,13 @@ def people_table(links: Links) -> str:
     return table(["person", "roles", "algorithms", "divergences found"], rows)
 
 def algorithm_body(
-    spec: AlgorithmSpec,
+    spec: MethodSpec,
     report: VerificationReport | None,
     links: Links = FROM_ALGORITHM,
     heading: str = "h1",
 ) -> str:
     """One algorithm, in the order a reader needs it: what it is for, where it
-    sits, the maths, where it came from, how to call it, what the engines did,
+    sits, the maths, where it came from, how to call it, what the backends did,
     what it is like, and who built the entry."""
     parameters = table(
         ["parameter", "type", "gigi default", "meaning"],
@@ -147,18 +147,18 @@ def algorithm_body(
             [
                 f"<code>{esc(p.name)}</code>",
                 esc(p.type),
-                "<em>engine default</em>" if p.common_default is None else f"<code>{esc(p.common_default)}</code>",
+                "<em>backend default</em>" if p.common_default is None else f"<code>{esc(p.common_default)}</code>",
                 esc(p.description.strip()),
             ]
             for p in spec.parameters
         ],
     )
 
-    engines = table(
-        ["engine", "supported", "notes"],
+    backends = table(
+        ["backend", "supported", "notes"],
         [
             [f"<code>{esc(name)}</code>", "yes" if support.supported else "no", esc(support.notes or "")]
-            for name, support in spec.engines.items()
+            for name, support in spec.backends.items()
         ],
     )
 
@@ -175,7 +175,7 @@ def algorithm_body(
             evidence = (
                 f'<span class="pill ok">reproduced</span> on '
                 f'{", ".join(f"<code>{esc(d)}</code>" for d in check.datasets)}, '
-                f'{" vs ".join(f"<code>{esc(e)}</code>" for e in check.engines)}'
+                f'{" vs ".join(f"<code>{esc(e)}</code>" for e in check.backends)}'
                 + (f", max abs error <code>{error:.3e}</code>" if error is not None else "")
             )
         else:
@@ -186,7 +186,7 @@ def algorithm_body(
 <div class="tags"><code>{esc(divergence.id)}</code>
 <span class="pill">{esc(divergence.category.value)}</span>
 <span class="pill">severity {esc(divergence.severity.value)}</span>
-{" ".join(f'<span class="pill">{esc(e)}</span>' for e in divergence.engines)}</div>
+{" ".join(f'<span class="pill">{esc(e)}</span>' for e in divergence.backends)}</div>
 <p>{esc(divergence.summary.strip())}</p>
 {f"<p><strong>Consequence.</strong> {esc(divergence.consequence.strip())}</p>" if divergence.consequence else ""}
 <p class="mono">{evidence}</p>
@@ -199,8 +199,8 @@ def algorithm_body(
         run_rows = [
             [
                 f"<code>{esc(r.dataset_id)}</code>",
-                f"<code>{esc(r.engine)}</code>",
-                esc(r.engine_version or "-"),
+                f"<code>{esc(r.backend)}</code>",
+                esc(r.backend_version or "-"),
                 esc(r.status.value),
                 f"{r.total_duration_ms:.1f}",
                 "<br>".join(
@@ -211,26 +211,26 @@ def algorithm_body(
         ]
         undeclared = (
             "".join(
-                f'<p class="bad">Undeclared difference: <code>{esc(d.engine_a)}</code> vs '
-                f'<code>{esc(d.engine_b)}</code> on <code>{esc(d.dataset_id)}</code></p>'
+                f'<p class="bad">Undeclared difference: <code>{esc(d.backend_a)}</code> vs '
+                f'<code>{esc(d.backend_b)}</code> on <code>{esc(d.dataset_id)}</code></p>'
                 for d in report.undeclared_differences
             )
             or '<p class="ok">No undeclared differences: with every ambiguous parameter '
-            "pinned, all engines agreed within tolerance.</p>"
+            "pinned, all backends agreed within tolerance.</p>"
         )
         verification = f"""
 <h2>Verification {status_pill(report.status)}</h2>
 <p class="lede">{esc(report.conclusion)}</p>
 {undeclared}
 <h3>Effective parameters, per run</h3>
-<p class="lede">What the engine actually used, as opposed to what was requested.</p>
-{table(["dataset", "engine", "version", "status", "ms", "effective parameters"], run_rows)}
+<p class="lede">What the backend actually used, as opposed to what was requested.</p>
+{table(["dataset", "backend", "version", "status", "ms", "effective parameters"], run_rows)}
 """
 
     return f"""
 <p><a href="{esc(links.index)}">&larr; registry</a></p>
 <{heading} id="algorithm-{esc(spec.id)}">{esc(spec.name)}</{heading}>
-<p class="lede">{esc(spec.problem.strip())}</p>
+<p class="lede">{esc(spec.summary.strip())}</p>
 <p><span class="pill">{esc(spec.family)}</span>
 <span class="pill">{esc(spec.maturity.value)}</span>
 <span class="pill">output: {esc(spec.output.kind.value)}</span>
@@ -243,8 +243,8 @@ def algorithm_body(
 <h2>Parameters</h2>
 {parameters}
 
-<h2>Engines</h2>
-{engines}
+<h2>Backends</h2>
+{backends}
 
 <h2>Divergences</h2>
 {"".join(divergence_blocks) or "<p>None recorded yet.</p>"}

@@ -12,79 +12,79 @@ import pytest
 
 from conftest import executable_algorithms
 from gigi import invariants, registry
-from gigi.graph import list_datasets
-from gigi.harness import compare, runnable_engines
+from gigi.data import list_datasets
+from gigi.harness import compare, runnable_backends
 
 # Frontier entries are excluded unless opted in; see tests/conftest.py.
 ALGORITHMS = executable_algorithms()
 
 
-@pytest.mark.parametrize("algorithm_id", ALGORITHMS)
-def test_stable_algorithms_state_their_maths(algorithm_id):
-    spec = registry.load_algorithm(algorithm_id)
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_stable_algorithms_state_their_maths(method_id):
+    spec = registry.load_method(method_id)
     if spec.maturity.value != "stable":
         return
-    assert spec.maths.summary, f"{algorithm_id}: maths.summary is empty"
-    assert spec.maths.definition, f"{algorithm_id}: no maths.definition"
+    assert spec.maths.summary, f"{method_id}: maths.summary is empty"
+    assert spec.maths.definition, f"{method_id}: no maths.definition"
     assert spec.maths.definition.statement.strip()
 
 
-@pytest.mark.parametrize("algorithm_id", ALGORITHMS)
-def test_every_checkable_invariant_is_implemented(algorithm_id):
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_every_checkable_invariant_is_implemented(method_id):
     """A property that names no check is a comment with extra steps."""
-    spec = registry.load_algorithm(algorithm_id)
+    spec = registry.load_method(method_id)
     for invariant in spec.maths.checkable():
         assert invariants.known(invariant.id), (
-            f"{algorithm_id}: invariant {invariant.id!r} has no check in "
+            f"{method_id}: invariant {invariant.id!r} has no check in "
             f"gigi/invariants.py (known: {sorted(invariants.CHECKS)})"
         )
 
 
-@pytest.mark.parametrize("algorithm_id", ALGORITHMS)
-def test_stable_algorithms_check_something(algorithm_id):
-    spec = registry.load_algorithm(algorithm_id)
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_stable_algorithms_check_something(method_id):
+    spec = registry.load_method(method_id)
     if spec.maturity.value != "stable":
         return
     assert spec.maths.checkable(), (
-        f"{algorithm_id} is stable but asserts no property of its own output"
+        f"{method_id} is stable but asserts no property of its own output"
     )
 
 
-@pytest.mark.parametrize("algorithm_id", ALGORITHMS)
-def test_invariants_hold_on_every_engine(algorithm_id):
-    """The point of the whole exercise: the maths is asserted on every engine,
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_invariants_hold_on_every_engine(method_id):
+    """The point of the whole exercise: the maths is asserted on every backend,
     on every fixture, not just believed."""
-    spec = registry.load_algorithm(algorithm_id)
-    engines = runnable_engines(spec)
+    spec = registry.load_method(method_id)
+    backends = runnable_backends(spec)
     for dataset_id in spec.datasets:
-        runs, _ = compare(spec, dataset_id, engines=engines, explicit=True)
+        runs, _ = compare(spec, dataset_id, backends=backends, explicit=True)
         for result in runs:
             if result.result is None:
                 continue
             assert result.invariants, (
-                f"{result.engine} on {dataset_id}: no invariants were checked"
+                f"{result.backend} on {dataset_id}: no invariants were checked"
             )
             excused = any(
-                d.detect and dataset_id in d.detect.datasets and result.engine in d.detect.engines
+                d.detect and dataset_id in d.detect.datasets and result.backend in d.detect.backends
                 for d in spec.divergences
             )
             failures = [f"{i.invariant_id}: {i.detail}" for i in result.failed_invariants]
             assert not failures or excused, (
-                f"{result.engine} on {dataset_id}: {failures} -- and no declared "
+                f"{result.backend} on {dataset_id}: {failures} -- and no declared "
                 f"divergence accounts for it"
             )
 
 
-@pytest.mark.parametrize("algorithm_id", ALGORITHMS)
-def test_choice_points_resolve(algorithm_id):
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_choice_points_resolve(method_id):
     """Where the definition is under-determined, any divergence or fixture it
     points at must exist -- otherwise the link rots silently."""
-    spec = registry.load_algorithm(algorithm_id)
+    spec = registry.load_method(method_id)
     known_datasets = set(list_datasets())
     declared = {d.id for d in spec.divergences}
 
     ids = [choice.id for choice in spec.maths.under_determined]
-    assert len(ids) == len(set(ids)), f"{algorithm_id}: duplicate choice point ids"
+    assert len(ids) == len(set(ids)), f"{method_id}: duplicate choice point ids"
 
     for choice in spec.maths.under_determined:
         assert choice.question.strip(), f"{choice.id}: no question"
@@ -99,27 +99,27 @@ def test_choice_points_resolve(algorithm_id):
             )
 
 
-@pytest.mark.parametrize("algorithm_id", ALGORITHMS)
-def test_every_declared_divergence_has_a_choice_point(algorithm_id):
-    """Engines do not differ at random. If they diverge, the definition left
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_every_declared_divergence_has_a_choice_point(method_id):
+    """Backends do not differ at random. If they diverge, the definition left
     room for it, and that room should be named."""
-    spec = registry.load_algorithm(algorithm_id)
+    spec = registry.load_method(method_id)
     if spec.maturity.value != "stable":
         return
     covered = {d for c in spec.maths.under_determined for d in c.divergences}
     for divergence in spec.divergences:
         assert divergence.id in covered, (
-            f"{algorithm_id}: divergence {divergence.id!r} has no matching entry "
+            f"{method_id}: divergence {divergence.id!r} has no matching entry "
             f"in maths.under_determined -- say which choice in the definition "
-            f"the engines made differently"
+            f"the backends made differently"
         )
 
 
 def test_unknown_invariant_id_is_reported_not_ignored():
-    from gigi.models import Invariant, NodeScoreResult
+    from gigi.models import Invariant, OutputKind, ScoreResult
 
     outcomes = invariants.check_all(
-        NodeScoreResult(scores={"a": 1.0}),
+        ScoreResult(kind=OutputKind.node_score, scores={"a": 1.0}),
         [Invariant(id="not_a_real_check", statement="...", check=True)],
     )
     assert outcomes[0].passed is False
@@ -127,9 +127,9 @@ def test_unknown_invariant_id_is_reported_not_ignored():
 
 
 def test_checks_actually_catch_violations():
-    from gigi.models import Invariant, NodeScoreResult
+    from gigi.models import Invariant, OutputKind, ScoreResult
 
-    broken = NodeScoreResult(scores={"a": 0.5, "b": -0.1})
+    broken = ScoreResult(kind=OutputKind.node_score, scores={"a": 0.5, "b": -0.1})
     outcomes = invariants.check_all(
         broken,
         [

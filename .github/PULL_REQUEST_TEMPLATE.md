@@ -20,7 +20,7 @@ that do not apply. See [docs/REVIEWING.md](../docs/REVIEWING.md).
 - [ ] The reference implementation computes what `maths.definition` says.
 - [ ] Someone could learn the algorithm from the reference implementation.
 - [ ] `maths.md` and the `maths:` block agree.
-- [ ] Each divergence is the engine's behaviour, explained in `notes.md`, and
+- [ ] Each divergence is the backend's behaviour, explained in `notes.md`, and
       not something our adapter caused.
 - [ ] The provenance is honest: precursors real, contested credit noted rather
       than resolved in our favour.

@@ -1,0 +1,15 @@
+kind: vectors
+id: vectors-small
+description: >
+  Four vectors in three dimensions, chosen so every pairwise cosine is an exact
+  number derivable by hand: one parallel pair, one antiparallel pair, and
+  orthogonality everywhere else. `b` is `a` doubled, which is what makes scale
+  invariance visible rather than asserted.
+id_column: id
+features:
+  zero_vectors: false
+  negative_values: true
+expected:
+  vectors: 4
+  dimensions: 3
+license: CC0

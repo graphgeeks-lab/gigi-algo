@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import os
 
-from gigi.models import AlgorithmSpec, Maturity
+from gigi.models import MethodSpec, Maturity
 
 FRONTIER_ENV = "GIGI_ALLOW_FRONTIER"
 _TRUE = {"1", "true", "yes", "on"}
@@ -36,12 +36,12 @@ def frontier_allowed(explicit: bool = False) -> bool:
     return explicit or os.environ.get(FRONTIER_ENV, "").strip().lower() in _TRUE
 
 
-def gated(spec: AlgorithmSpec) -> bool:
+def gated(spec: MethodSpec) -> bool:
     """Does this algorithm need an opt-in before it will run?"""
     return spec.maturity is Maturity.frontier
 
 
-def check_runnable(spec: AlgorithmSpec, allow_frontier: bool = False) -> None:
+def check_runnable(spec: MethodSpec, allow_frontier: bool = False) -> None:
     """Raise unless this algorithm may run under the current policy."""
     if gated(spec) and not frontier_allowed(allow_frontier):
         raise FrontierBlocked(

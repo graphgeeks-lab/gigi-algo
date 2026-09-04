@@ -11,10 +11,11 @@ import uuid
 from typing import Any
 
 from gigi import registry
-from gigi.adapters import available_engines, engine_versions, get_engine
-from gigi.graph import GraphData, load_graph, profile_graph
+from gigi.backends import available_backends, backend_versions, get_backend
+from gigi.data import Dataset, load_dataset, profile_dataset
+from gigi.graph import GraphData
 from gigi.models import (
-    AlgorithmSpec,
+    MethodSpec,
     Comparison,
     Difference,
     DivergenceCheck,
@@ -22,27 +23,27 @@ from gigi.models import (
     RunStatus,
     VerificationReport,
 )
-from gigi.invariants import check_all
+from gigi.invariants import CheckContext, check_all
 from gigi.maturity import check_runnable
-from gigi.results import compare_results, normalize_node_score
+from gigi.results import compare_results, normalize
 
 REFERENCE = "reference"
 
 # `weight_property` is tri-state and that is the point:
-#   None   -> let the engine apply its own default (which is what diverges)
+#   None   -> let the backend apply its own default (which is what diverges)
 #   False  -> explicitly unweighted
 #   "name" -> use this edge attribute
 WEIGHT_PROPERTY = "weight_property"
 
 
-def default_parameters(spec: AlgorithmSpec) -> dict[str, Any]:
+def default_parameters(spec: MethodSpec) -> dict[str, Any]:
     """What a caller gets when they ask for nothing: Gigi's canonical defaults
-    where the community agrees on one, and the engine's own default everywhere
-    else. This is the configuration under which engines disagree."""
+    where the community agrees on one, and the backend's own default everywhere
+    else. This is the configuration under which backends disagree."""
     return {p.name: p.common_default for p in spec.parameters}
 
 
-def explicit_parameters(spec: AlgorithmSpec, graph: GraphData) -> dict[str, Any]:
+def explicit_parameters(spec: MethodSpec, data: Dataset) -> dict[str, Any]:
     """Every ambiguous parameter pinned, so that any remaining disagreement is
     a real semantic difference rather than a difference of defaults.
 
@@ -52,42 +53,46 @@ def explicit_parameters(spec: AlgorithmSpec, graph: GraphData) -> dict[str, Any]
     """
     params = default_parameters(spec)
     params.update(spec.verification.parameters)
-    if WEIGHT_PROPERTY in params:
-        params[WEIGHT_PROPERTY] = graph.weight_column or False
+    # Only a graph has a weight column. A method whose input is not a graph
+    # never declares the parameter, so this is a guard rather than a branch
+    # anyone has to think about.
+    if WEIGHT_PROPERTY in params and isinstance(data, GraphData):
+        params[WEIGHT_PROPERTY] = data.weight_column or False
     return params
 
 
 def resolve_parameters(
-    spec: AlgorithmSpec,
-    graph: GraphData,
+    spec: MethodSpec,
+    data: Dataset,
     overrides: dict[str, Any] | None = None,
     explicit: bool = False,
 ) -> dict[str, Any]:
     """Canonical parameters for one run: defaults, then pinned values if
     `explicit`, then whatever the caller asked for."""
-    params = explicit_parameters(spec, graph) if explicit else default_parameters(spec)
+    params = explicit_parameters(spec, data) if explicit else default_parameters(spec)
     params.update(overrides or {})
     return params
 
 
-def _load(algorithm: str | AlgorithmSpec) -> AlgorithmSpec:
-    return algorithm if isinstance(algorithm, AlgorithmSpec) else registry.load_algorithm(algorithm)
+def _load(algorithm: str | MethodSpec) -> MethodSpec:
+    return algorithm if isinstance(algorithm, MethodSpec) else registry.load_method(algorithm)
 
 
-def _load_graph(graph: str | GraphData) -> GraphData:
-    return graph if isinstance(graph, GraphData) else load_graph(graph)
+def _load_data(dataset: str | Dataset) -> Dataset:
+    """A dataset id, or an already-loaded dataset of whatever kind."""
+    return load_dataset(dataset) if isinstance(dataset, str) else dataset
 
 
 def run(
-    algorithm: str | AlgorithmSpec,
-    engine: str,
-    graph: str | GraphData,
+    algorithm: str | MethodSpec,
+    backend: str,
+    dataset: str | Dataset,
     parameters: dict[str, Any] | None = None,
     allow_frontier: bool = False,
 ) -> RunResult:
-    """Execute one algorithm on one engine and return a fully described run.
+    """Execute one algorithm on one backend and return a fully described run.
 
-    An *engine* failure is a RunResult with a status, never an exception:
+    An *backend* failure is a RunResult with a status, never an exception:
     verification needs to report what did not run as much as what did. A
     *policy* refusal is different -- a frontier algorithm without opt-in raises
     `FrontierBlocked`, because there is no result to describe and the caller
@@ -95,34 +100,34 @@ def run(
     """
     spec = _load(algorithm)
     check_runnable(spec, allow_frontier)
-    data = _load_graph(graph)
-    module = get_engine(engine)
+    data = _load_data(dataset)
+    module = get_backend(backend)
 
     from gigi import __version__
 
     result = RunResult(
         run_id=uuid.uuid4().hex[:12],
-        algorithm_id=spec.id,
+        method_id=spec.id,
         gigi_version=__version__,
-        engine=engine,
-        engine_version=module.version() if module.available() else None,
+        backend=backend,
+        backend_version=module.version() if module.available() else None,
         dataset_id=data.id,
         requested_parameters=dict(parameters or {}),
     )
 
     if not module.available():
         result.status = RunStatus.unavailable
-        result.error = f"{engine} is not installed"
+        result.error = f"{backend} is not installed"
         return result
 
-    if not registry.has_implementation(spec.id, engine):
+    if not registry.has_implementation(spec.id, backend):
         result.status = RunStatus.unsupported
-        result.error = f"{spec.id} has no {engine} implementation"
+        result.error = f"{spec.id} has no {backend} implementation"
         return result
 
     params = resolve_parameters(spec, data, parameters)
     result.requested_parameters = params
-    result.graph_profile = profile_graph(data)
+    result.profile = profile_dataset(data)
 
     try:
         started = time.perf_counter()
@@ -130,23 +135,31 @@ def run(
         result.conversion_duration_ms = (time.perf_counter() - started) * 1000
         result.warnings.extend(converted.notes)
 
-        implementation = registry.load_implementation(spec.id, engine)
+        implementation = registry.load_implementation(spec.id, backend)
         started = time.perf_counter()
         payload, effective = implementation.run(converted, params)
         result.execution_duration_ms = (time.perf_counter() - started) * 1000
         result.effective_parameters = dict(effective)
 
         started = time.perf_counter()
-        result.result = normalize_node_score(
-            payload, converted.node_ids, spec.output.score_name or "score"
+        result.result = normalize(
+            payload,
+            converted.result_keys,
+            spec.output,
+            require_all_keys=converted.keys_are_complete,
         )
         result.normalization_duration_ms = (time.perf_counter() - started) * 1000
 
         # The maths, executed. Every property the spec claims is asserted here,
-        # on every engine and every fixture -- which is what stops `maths:`
-        # from being decoration.
-        result.invariants = check_all(result.result, spec.maths.invariants)
-    except Exception as exc:  # engines fail in engine-specific ways
+        # on every backend and every fixture -- which is what stops `maths:`
+        # from being decoration. The dataset goes too: "every component is
+        # connected" is a claim about the result *and* the graph it came from.
+        result.invariants = check_all(
+            result.result,
+            spec.maths.invariants,
+            CheckContext(data=data, parameters=result.effective_parameters),
+        )
+    except Exception as exc:  # backends fail in backend-specific ways
         result.status = RunStatus.error
         result.error = f"{type(exc).__name__}: {exc}"
 
@@ -154,23 +167,23 @@ def run(
 
 
 def compare(
-    algorithm: str | AlgorithmSpec,
-    graph: str | GraphData,
-    engines: list[str] | None = None,
+    algorithm: str | MethodSpec,
+    dataset: str | Dataset,
+    backends: list[str] | None = None,
     parameters: dict[str, Any] | None = None,
     explicit: bool = True,
     baseline: str = REFERENCE,
     allow_frontier: bool = False,
 ) -> tuple[list[RunResult], list[Comparison]]:
-    """Run every engine on one graph and compare each against the baseline."""
+    """Run every backend on one dataset and compare each against the baseline."""
     spec = _load(algorithm)
     check_runnable(spec, allow_frontier)
-    data = _load_graph(graph)
+    data = _load_data(dataset)
     params = resolve_parameters(spec, data, parameters, explicit=explicit)
 
-    candidates = engines or runnable_engines(spec)
-    runs = [run(spec, engine, data, params, allow_frontier=True) for engine in candidates]
-    by_engine = {r.engine: r for r in runs}
+    candidates = backends or runnable_backends(spec)
+    runs = [run(spec, backend, data, params, allow_frontier=True) for backend in candidates]
+    by_engine = {r.backend: r for r in runs}
 
     comparisons: list[Comparison] = []
     reference_run = by_engine.get(baseline)
@@ -178,7 +191,7 @@ def compare(
         return runs, comparisons
 
     for candidate in runs:
-        if candidate.engine == baseline or candidate.result is None:
+        if candidate.backend == baseline or candidate.result is None:
             continue
         comparisons.append(
             compare_results(
@@ -186,33 +199,33 @@ def compare(
                 data.id,
                 baseline,
                 reference_run.result,
-                candidate.engine,
+                candidate.backend,
                 candidate.result,
             )
         )
     return runs, comparisons
 
 
-def runnable_engines(spec: AlgorithmSpec) -> list[str]:
-    """Engines that are both installed and implemented for this algorithm."""
+def runnable_backends(spec: MethodSpec) -> list[str]:
+    """Backends that are both installed and implemented for this algorithm."""
     return [
-        engine
-        for engine in available_engines()
-        if registry.has_implementation(spec.id, engine)
+        backend
+        for backend in available_backends()
+        if registry.has_implementation(spec.id, backend)
     ]
 
 
 def verify(
-    algorithm: str | AlgorithmSpec,
+    algorithm: str | MethodSpec,
     datasets: list[str] | None = None,
-    engines: list[str] | None = None,
+    backends: list[str] | None = None,
     allow_frontier: bool = False,
 ) -> VerificationReport:
     """The registry's claims, checked against reality.
 
     Two independent questions, deliberately not mixed:
 
-    1. With every ambiguous parameter pinned, do the engines agree? Any
+    1. With every ambiguous parameter pinned, do the backends agree? Any
        disagreement must be named by a declared divergence, or verification
        fails.
     2. Does each declared divergence still reproduce under the conditions the
@@ -223,75 +236,75 @@ def verify(
     # Checked once here so the refusal is immediate and legible, rather than
     # arriving from inside a loop over fixtures.
     check_runnable(spec, allow_frontier)
-    candidates = engines or runnable_engines(spec)
+    candidates = backends or runnable_backends(spec)
     dataset_ids = datasets or spec.datasets
 
     from gigi import __version__
 
     report = VerificationReport(
-        algorithm_id=spec.id,
+        method_id=spec.id,
         gigi_version=__version__,
-        engines=candidates,
-        engine_versions={k: v for k, v in engine_versions().items() if k in candidates},
+        backends=candidates,
+        backend_versions={k: v for k, v in backend_versions().items() if k in candidates},
     )
 
     for dataset_id in dataset_ids:
-        data = load_graph(dataset_id)
+        data = load_dataset(dataset_id)
         runs, comparisons = compare(
-            spec, data, engines=candidates, explicit=True, allow_frontier=True
+            spec, data, backends=candidates, explicit=True, allow_frontier=True
         )
         report.runs.extend(runs)
         report.comparisons.extend(comparisons)
 
         for broken in (r for r in runs if r.failed_invariants):
             first = broken.failed_invariants[0]
-            known = _explaining_divergence(spec, dataset_id, broken.engine)
+            known = _explaining_divergence(spec, dataset_id, broken.backend)
             difference = Difference(
                 dataset_id=dataset_id,
-                engine_a="reference",
-                engine_b=broken.engine,
+                backend_a="reference",
+                backend_b=broken.backend,
                 divergence_id=known,
                 detail=f"violated {first.invariant_id}: {first.detail}",
             )
             if known:
-                # The registry already says this engine misbehaves here -- an
+                # The registry already says this backend misbehaves here -- an
                 # invariant failure is one more way of seeing the same thing.
                 report.explained_differences.append(difference)
             else:
                 report.status = "fail"
                 report.undeclared_differences.append(difference)
                 report.conclusion = (
-                    f"{broken.engine} violated {first.invariant_id} on {dataset_id}: "
+                    f"{broken.backend} violated {first.invariant_id} on {dataset_id}: "
                     f"{first.detail}"
                 )
 
         for failed in (r for r in runs if r.status == RunStatus.error):
-            known = _explaining_divergence(spec, dataset_id, failed.engine)
+            known = _explaining_divergence(spec, dataset_id, failed.backend)
             difference = Difference(
                 dataset_id=dataset_id,
-                engine_a="reference",
-                engine_b=failed.engine,
+                backend_a="reference",
+                backend_b=failed.backend,
                 divergence_id=known,
                 detail=failed.error or "run failed",
             )
             if known:
-                # The registry already says this engine cannot run here.
+                # The registry already says this backend cannot run here.
                 report.explained_differences.append(difference)
             else:
                 report.undeclared_differences.append(difference)
-                report.conclusion = f"{failed.engine} failed on {dataset_id}: {failed.error}"
+                report.conclusion = f"{failed.backend} failed on {dataset_id}: {failed.error}"
 
         for comparison in comparisons:
             if comparison.equivalent:
                 continue
             difference = Difference(
                 dataset_id=dataset_id,
-                engine_a=comparison.engine_a,
-                engine_b=comparison.engine_b,
+                backend_a=comparison.backend_a,
+                backend_b=comparison.backend_b,
                 metrics=comparison.metrics,
                 detail="; ".join(comparison.notes) or "results differ beyond tolerance",
             )
-            known = _explaining_divergence(spec, dataset_id, comparison.engine_b)
+            known = _explaining_divergence(spec, dataset_id, comparison.backend_b)
             if known:
                 difference.divergence_id = known
                 report.explained_differences.append(difference)
@@ -310,15 +323,15 @@ def verify(
     return report
 
 
-def _explaining_divergence(spec: AlgorithmSpec, dataset_id: str, engine: str) -> str | None:
+def _explaining_divergence(spec: MethodSpec, dataset_id: str, backend: str) -> str | None:
     for divergence in spec.divergences:
         detect = divergence.detect
-        if detect and dataset_id in detect.datasets and engine in detect.engines:
+        if detect and dataset_id in detect.datasets and backend in detect.backends:
             return divergence.id
     return None
 
 
-def _check_divergences(spec: AlgorithmSpec, candidates: list[str]) -> list[DivergenceCheck]:
+def _check_divergences(spec: MethodSpec, candidates: list[str]) -> list[DivergenceCheck]:
     """Re-run every declared divergence. One check per divergence, across every
     fixture it names -- the claim reproduces only if it holds on all of them."""
     checks: list[DivergenceCheck] = []
@@ -330,17 +343,17 @@ def _check_divergences(spec: AlgorithmSpec, candidates: list[str]) -> list[Diver
         check = DivergenceCheck(
             divergence_id=divergence.id,
             datasets=detect.datasets,
-            engines=detect.engines,
+            backends=detect.backends,
             expected=detect.expect,
             observed="skipped",
             reproduced=False,
         )
-        missing = [engine for engine in detect.engines if engine not in candidates]
-        if missing or len(detect.engines) != 2:
+        missing = [backend for backend in detect.backends if backend not in candidates]
+        if missing or len(detect.backends) != 2:
             check.note = (
                 f"skipped: {', '.join(missing)} unavailable"
                 if missing
-                else "detect.engines must name exactly two engines"
+                else "detect.backends must name exactly two backends"
             )
             checks.append(check)
             continue
@@ -368,20 +381,20 @@ def _check_divergences(spec: AlgorithmSpec, candidates: list[str]) -> list[Diver
 
 
 def _observe(
-    spec: AlgorithmSpec, detect, dataset_id: str
+    spec: MethodSpec, detect, dataset_id: str
 ) -> tuple[str, dict[str, float]]:
-    """What actually happens when the two engines meet this fixture."""
-    first, second = detect.engines
+    """What actually happens when the two backends meet this fixture."""
+    first, second = detect.backends
     runs, comparisons = compare(
         spec,
-        load_graph(dataset_id),
-        engines=[first, second],
+        load_dataset(dataset_id),
+        backends=[first, second],
         parameters=detect.parameters,
         explicit=False,
         baseline=first,
         allow_frontier=True,
     )
-    subject = next((r for r in runs if r.engine == second), None)
+    subject = next((r for r in runs if r.backend == second), None)
 
     if subject is not None and subject.status == RunStatus.error:
         return "error", {}
@@ -392,11 +405,11 @@ def _observe(
 
 
 def _conclude(report: VerificationReport) -> str:
-    engines = ", ".join(report.engines)
+    backends = ", ".join(report.backends)
     if report.status == "pass":
         reproduced = sum(1 for c in report.divergence_checks if c.reproduced)
         return (
-            f"{len(report.runs)} runs across {engines}; engines agree wherever the "
+            f"{len(report.runs)} runs across {backends}; backends agree wherever the "
             f"registry says they should; {reproduced} declared divergence(s) reproduced"
         )
     return (

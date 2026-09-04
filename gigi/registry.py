@@ -1,7 +1,7 @@
-"""Load algorithm specs and their per-engine implementations.
+"""Load algorithm specs and their per-backend implementations.
 
 An algorithm is a directory. Nothing is registered in code: adding
-`algorithms/<id>/algorithm.yaml` is the entire registration step.
+`algorithms/<id>/method.yaml` is the entire registration step.
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ from types import ModuleType
 import yaml
 from pydantic import ValidationError
 
-from gigi.models import AlgorithmSpec, Family, Maturity
-from gigi.paths import algorithms_dir, families_file
+from gigi.models import DomainSpec, Family, Maturity, MethodSpec, ProblemSpec
+from gigi.paths import domains_file, families_file, methods_dir, problems_dir
 
 
 class RegistryError(Exception):
@@ -32,6 +32,116 @@ class RegistryError(Exception):
 # rather than as free-text on each spec means the taxonomy can be navigated,
 # and that a typo is an error rather than a new family.
 # --------------------------------------------------------------------------
+
+
+# --------------------------------------------------------------------------
+# Problems
+#
+# A problem is a question, stated without reference to any method. It exists so
+# that "which method should I use?" has somewhere to start that is not a method
+# name, and so that `gigi why` can say what a method does *not* answer by
+# naming other people's questions rather than waving vaguely.
+# --------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def _problems() -> dict[str, ProblemSpec]:
+    directory = problems_dir()
+    if not directory.is_dir():
+        return {}
+    problems: dict[str, ProblemSpec] = {}
+    for path in sorted(directory.glob("*.yaml")):
+        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        try:
+            problem = ProblemSpec.model_validate(raw)
+        except ValidationError as exc:
+            raise RegistryError(f"{path}: {exc}") from exc
+        if problem.id != path.stem:
+            raise RegistryError(f"{path}: id is {problem.id!r} but the file is {path.stem!r}")
+        problems[problem.id] = problem
+    return problems
+
+
+def list_problems() -> list[ProblemSpec]:
+    """Every problem, sorted by id."""
+    return sorted(_problems().values(), key=lambda p: p.id)
+
+
+def load_problem(problem_id: str) -> ProblemSpec:
+    """One problem, or an error naming the ones that exist."""
+    problems = _problems()
+    if problem_id not in problems:
+        known = ", ".join(sorted(problems)) or "none"
+        raise RegistryError(f"unknown problem {problem_id!r} (known: {known})")
+    return problems[problem_id]
+
+
+def problem_exists(problem_id: str) -> bool:
+    return problem_id in _problems()
+
+
+def methods_for_problem(problem_id: str) -> list[str]:
+    """Which methods claim to solve this."""
+    return [m for m in list_methods() if problem_id in load_method(m).problems]
+
+
+@lru_cache(maxsize=1)
+def _domains() -> dict[str, DomainSpec]:
+    path = domains_file()
+    if not path.is_file():
+        return {}
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or []
+    domains: dict[str, DomainSpec] = {}
+    for entry in raw:
+        try:
+            domain = DomainSpec.model_validate(entry)
+        except ValidationError as exc:
+            raise RegistryError(f"{path}: {exc}") from exc
+        if domain.id in domains:
+            raise RegistryError(f"{path}: duplicate domain id {domain.id!r}")
+        domains[domain.id] = domain
+    return domains
+
+
+def list_domains() -> list[DomainSpec]:
+    """Every domain, sorted by id."""
+    return sorted(_domains().values(), key=lambda d: d.id)
+
+
+def load_domain(domain_id: str) -> DomainSpec:
+    """One domain, or an error naming the ones that exist."""
+    domains = _domains()
+    if domain_id not in domains:
+        known = ", ".join(sorted(domains)) or "none"
+        raise RegistryError(f"unknown domain {domain_id!r} (known: {known})")
+    return domains[domain_id]
+
+
+def domain_exists(domain_id: str) -> bool:
+    return domain_id in _domains()
+
+
+def domain_of(method_id_or_spec) -> str:
+    """A method's domain, derived through its family.
+
+    Not stored on the method: the family already knows, and two fields naming
+    one fact drift apart. Everything that groups methods by domain -- the site,
+    `gigi list --domain` -- comes through here.
+    """
+    spec = (
+        method_id_or_spec
+        if isinstance(method_id_or_spec, MethodSpec)
+        else load_method(method_id_or_spec)
+    )
+    return load_family(spec.family).domain
+
+
+def families_in_domain(domain_id: str) -> list[str]:
+    return [f.id for f in list_families() if f.domain == domain_id]
+
+
+def methods_in_domain(domain_id: str) -> list[str]:
+    return [m for m in list_methods() if domain_of(m) == domain_id]
 
 
 @lru_cache(maxsize=1)
@@ -83,62 +193,89 @@ def family_lineage(family_id: str) -> list[Family]:
     return list(reversed(lineage))
 
 
-def algorithms_in_family(family_id: str) -> list[str]:
-    return [a for a in list_algorithms() if load_algorithm(a).family == family_id]
+def methods_in_family(family_id: str) -> list[str]:
+    return [a for a in list_methods() if load_method(a).family == family_id]
 
 
-def list_algorithms() -> list[str]:
+def list_methods() -> list[str]:
     """Every algorithm id in the registry, sorted. Directories starting with
     `_` (`_schema`, `_template`) are infrastructure, not algorithms."""
-    root = algorithms_dir()
+    root = methods_dir()
     if not root.is_dir():
         return []
     return sorted(
         p.name
         for p in root.iterdir()
-        if p.is_dir() and not p.name.startswith("_") and (p / "algorithm.yaml").is_file()
+        if p.is_dir() and not p.name.startswith("_") and (p / "method.yaml").is_file()
     )
 
 
 @lru_cache(maxsize=None)
-def load_algorithm(algorithm_id: str) -> AlgorithmSpec:
-    """Read and validate one `algorithm.yaml`.
+def load_method(method_id: str) -> MethodSpec:
+    """Read and validate one `method.yaml`.
 
     Validation errors are re-raised with the file path attached, because the
     person who sees them is usually editing that file.
     """
-    path = algorithms_dir() / algorithm_id / "algorithm.yaml"
+    path = methods_dir() / method_id / "method.yaml"
     if not path.is_file():
-        known = ", ".join(list_algorithms()) or "none"
-        raise RegistryError(f"unknown algorithm {algorithm_id!r} (known: {known})")
+        known = ", ".join(list_methods()) or "none"
+        raise RegistryError(f"unknown algorithm {method_id!r} (known: {known})")
 
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     try:
-        spec = AlgorithmSpec.model_validate(raw)
+        spec = MethodSpec.model_validate(raw)
     except ValidationError as exc:  # point the contributor at the field
         raise RegistryError(f"{path}: {exc}") from exc
 
-    if spec.id != algorithm_id:
+    if spec.id != method_id:
         raise RegistryError(
-            f"{path}: id is {spec.id!r} but the directory is {algorithm_id!r}"
+            f"{path}: id is {spec.id!r} but the directory is {method_id!r}"
         )
     return spec
 
 
 # Named here so `review` can report "no igraph implementation yet" without
-# importing the adapter package, which pulls in the engines.
-ENGINE_NAMES = ("reference", "networkx", "igraph", "rustworkx")
+# importing the adapter package, which pulls in the backends. Each entry says
+# what the backend can be handed, so that a review never suggests writing a
+# NetworkX implementation of a measure over vectors.
+BACKEND_INPUT_KINDS: dict[str, tuple[str, ...]] = {
+    "reference": ("graph", "vectors"),
+    "networkx": ("graph",),
+    "igraph": ("graph",),
+    "rustworkx": ("graph",),
+    "scipy": ("vectors",),
+    "sklearn": ("vectors",),
+}
+BACKEND_NAMES = tuple(BACKEND_INPUT_KINDS)
 
 
-def set_maturity(algorithm_id: str, maturity: Maturity) -> Path:
-    """Rewrite the `maturity:` line of one algorithm.yaml.
+def plausible_backends(spec: MethodSpec) -> list[str]:
+    """Backends that could take this method's input, whether or not anyone has
+    written the implementation.
+
+    The set a missing implementation is measured against. A method's own
+    `backends:` map may additionally rule one out with a reason, and that is
+    respected: an explicit `supported: false` is an answer, not a gap.
+    """
+    kinds = {str(i.kind) for i in spec.inputs}
+    declined = {name for name, support in spec.backends.items() if not support.supported}
+    return sorted(
+        name
+        for name, accepted in BACKEND_INPUT_KINDS.items()
+        if kinds & set(accepted) and name not in declined
+    )
+
+
+def set_maturity(method_id: str, maturity: Maturity) -> Path:
+    """Rewrite the `maturity:` line of one method.yaml.
 
     The only write this package makes to the registry, and it exists so that
     promotion is a checked action rather than a hand edit that skips the
     checks. Everything else about the file is left exactly as the contributor
     wrote it.
     """
-    path = algorithm_dir(algorithm_id) / "algorithm.yaml"
+    path = method_dir(method_id) / "method.yaml"
     text = path.read_text(encoding="utf-8")
     updated, count = re.subn(
         r"^maturity:.*$", f"maturity: {maturity.value}", text, count=1, flags=re.M
@@ -146,25 +283,30 @@ def set_maturity(algorithm_id: str, maturity: Maturity) -> Path:
     if count != 1:
         raise RegistryError(f"{path}: could not find a `maturity:` line to rewrite")
     path.write_text(updated, encoding="utf-8")
-    load_algorithm.cache_clear()
+    load_method.cache_clear()
     return path
 
 
-def algorithm_dir(algorithm_id: str) -> Path:
-    return algorithms_dir() / algorithm_id
+def method_exists(method_id: str) -> bool:
+    """Is this method in the registry?"""
+    return method_id in set(list_methods())
 
 
-def implementation_path(algorithm_id: str, engine: str) -> Path:
-    return algorithm_dir(algorithm_id) / "implementations" / f"{engine}.py"
+def method_dir(method_id: str) -> Path:
+    return methods_dir() / method_id
 
 
-def has_implementation(algorithm_id: str, engine: str) -> bool:
-    return implementation_path(algorithm_id, engine).is_file()
+def implementation_path(method_id: str, backend: str) -> Path:
+    return method_dir(method_id) / "implementations" / f"{backend}.py"
 
 
-def implemented_engines(algorithm_id: str) -> list[str]:
-    """Engines this algorithm has a file for, whether installed or not."""
-    impl_dir = algorithm_dir(algorithm_id) / "implementations"
+def has_implementation(method_id: str, backend: str) -> bool:
+    return implementation_path(method_id, backend).is_file()
+
+
+def implemented_backends(method_id: str) -> list[str]:
+    """Backends this algorithm has a file for, whether installed or not."""
+    impl_dir = method_dir(method_id) / "implementations"
     if not impl_dir.is_dir():
         return []
     return sorted(
@@ -173,17 +315,17 @@ def implemented_engines(algorithm_id: str) -> list[str]:
 
 
 @lru_cache(maxsize=None)
-def load_implementation(algorithm_id: str, engine: str) -> ModuleType:
-    """Import `algorithms/<id>/implementations/<engine>.py` by path.
+def load_implementation(method_id: str, backend: str) -> ModuleType:
+    """Import `algorithms/<id>/implementations/<backend>.py` by path.
 
     Loading by path rather than by package name keeps `algorithms/` a plain
     content directory: no `__init__.py`, no import side effects, no packaging.
     """
-    path = implementation_path(algorithm_id, engine)
+    path = implementation_path(method_id, backend)
     if not path.is_file():
-        raise RegistryError(f"{algorithm_id} has no {engine} implementation ({path})")
+        raise RegistryError(f"{method_id} has no {backend} implementation ({path})")
 
-    module_name = f"gigi_impl_{algorithm_id}_{engine}"
+    module_name = f"gigi_impl_{method_id}_{backend}"
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:  # pragma: no cover - defensive
         raise RegistryError(f"could not load {path}")

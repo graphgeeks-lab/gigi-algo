@@ -12,19 +12,27 @@ from rich.table import Table
 
 from gigi import registry
 from gigi.cli.app import app, console
-from gigi.graph import list_datasets, load_graph
+from gigi.data import list_datasets, read_metadata
 
 @app.command("list")
-def list_command() -> None:
-    """List the algorithms in the registry."""
-    table = Table("id", "family", "maturity", "engines", "divergences")
-    for algorithm_id in registry.list_algorithms():
-        spec = registry.load_algorithm(algorithm_id)
+def list_command(
+    domain: str = typer.Option(None, "--domain", help="Only this domain, e.g. graph."),
+    kind: str = typer.Option(None, "--kind", help="Only this kind, e.g. algorithm."),
+) -> None:
+    """List the methods in the registry."""
+    table = Table("id", "kind", "domain", "family", "maturity", "backends", "divergences")
+    for method_id in registry.list_methods():
+        spec = registry.load_method(method_id)
+        method_domain = registry.domain_of(spec)
+        if (domain and method_domain != domain) or (kind and spec.kind.value != kind):
+            continue
         table.add_row(
             spec.id,
+            spec.kind.value,
+            method_domain,
             spec.family,
             spec.maturity.value,
-            ", ".join(registry.implemented_engines(spec.id)),
+            ", ".join(registry.implemented_backends(spec.id)),
             str(len(spec.divergences)),
         )
     console.print(table)
@@ -33,9 +41,9 @@ def list_command() -> None:
 @app.command()
 def show(algorithm: str) -> None:
     """Show what the registry claims about one algorithm."""
-    spec = registry.load_algorithm(algorithm)
+    spec = registry.load_method(algorithm)
     console.print(f"[bold]{spec.name}[/bold]  ({spec.id}, {spec.maturity.value})")
-    console.print(spec.problem.strip())
+    console.print(spec.summary.strip())
     console.print()
 
     params = Table("parameter", "type", "gigi default", "meaning", show_lines=False)
@@ -43,19 +51,19 @@ def show(algorithm: str) -> None:
         params.add_row(
             parameter.name,
             parameter.type,
-            "engine default" if parameter.common_default is None else str(parameter.common_default),
+            "backend default" if parameter.common_default is None else str(parameter.common_default),
             parameter.description.strip().split("\n")[0],
         )
     console.print(params)
 
     if spec.divergences:
         console.print()
-        divergences = Table("id", "severity", "engines", "summary")
+        divergences = Table("id", "severity", "backends", "summary")
         for divergence in spec.divergences:
             divergences.add_row(
                 divergence.id,
                 divergence.severity.value,
-                ", ".join(divergence.engines),
+                ", ".join(divergence.backends),
                 divergence.summary.strip(),
             )
         console.print(divergences)
@@ -70,7 +78,7 @@ def review_command(algorithm: str) -> None:
     from gigi.review import review
 
     result = review(algorithm)
-    spec = registry.load_algorithm(algorithm)
+    spec = registry.load_method(algorithm)
 
     console.print(
         f"[bold]Reviewing {spec.name}[/bold]  ({algorithm}, claims [bold]{result.maturity}[/bold])"
@@ -123,7 +131,7 @@ def review_command(algorithm: str) -> None:
 def version(
     as_json: bool = typer.Option(False, "--json", help="Machine-readable."),
 ) -> None:
-    """Which gigi, which engines, and which registry it is reading.
+    """Which gigi, which backends, and which registry it is reading.
 
     The registry path matters more than it looks: an installed wheel carries
     its own copy of the content, so this is how you tell whether you are
@@ -134,15 +142,15 @@ def version(
     import sys
 
     from gigi import __version__, people
-    from gigi.adapters import ENGINES, engine_versions
-    from gigi.graph import list_datasets
+    from gigi.backends import BACKENDS, backend_versions
+    from gigi.data import list_datasets
     from gigi.paths import repo_root
 
     root = repo_root()
     packaged = root.name == "_content"
-    algorithms = registry.list_algorithms()
-    divergences = sum(len(registry.load_algorithm(a).divergences) for a in algorithms)
-    installed = engine_versions()
+    algorithms = registry.list_methods()
+    divergences = sum(len(registry.load_method(a).divergences) for a in algorithms)
+    installed = backend_versions()
 
     if as_json:
         print(json.dumps({
@@ -155,7 +163,7 @@ def version(
                 "families": len(registry.list_families()),
                 "people": len(people.list_people()), "divergences": divergences,
             },
-            "engines": {name: installed.get(name) for name in ENGINES},
+            "backends": {name: installed.get(name) for name in BACKENDS},
         }, indent=2))
         return
 
@@ -170,8 +178,8 @@ def version(
         f"{divergences} divergences"
     )
     console.print()
-    engines_table = Table("engine", "version")
-    for name in ENGINES:
+    engines_table = Table("backend", "version")
+    for name in BACKENDS:
         engines_table.add_row(name, installed.get(name) or "[dim]not installed[/dim]")
     console.print(engines_table)
 
@@ -192,7 +200,7 @@ def promote(
     from gigi import requirements
     from gigi.models import Maturity
 
-    spec = registry.load_algorithm(algorithm)
+    spec = registry.load_method(algorithm)
     if to:
         try:
             target = Maturity(to)
@@ -233,14 +241,14 @@ def promote(
     console.print("[bold]Still to do, by a person:[/bold]")
     console.print("  - add a line to CHANGELOG.md saying what promotion means for a user")
     console.print("  - have someone who did not write the entry read it (docs/REVIEWING.md)")
-    console.print("  - commit the change to algorithm.yaml")
+    console.print("  - commit the change to method.yaml")
 
 
 @app.command()
 def maths(algorithm: str) -> None:
     """The mathematics: definition, invariants, and where the definition leaves
     a choice open."""
-    spec = registry.load_algorithm(algorithm)
+    spec = registry.load_method(algorithm)
     block = spec.maths
 
     console.print(f"[bold]{spec.name}[/bold]")
@@ -269,23 +277,24 @@ def maths(algorithm: str) -> None:
             for option in choice.choices:
                 console.print(f"    - {option}")
             if choice.divergences:
-                console.print(f"    [red]engines differ:[/red] {', '.join(choice.divergences)}")
+                console.print(f"    [red]backends differ:[/red] {', '.join(choice.divergences)}")
             elif choice.datasets:
                 console.print(
-                    f"    [green]engines agree[/green] on {', '.join(choice.datasets)}"
+                    f"    [green]backends agree[/green] on {', '.join(choice.datasets)}"
                 )
 
 
 @app.command()
 def families() -> None:
-    """The algorithm taxonomy. A family is a question, not a label."""
-    table = Table("family", "the question it answers", "within", "algorithms")
+    """The method taxonomy. A family is a question, not a label."""
+    table = Table("family", "domain", "the question it answers", "within", "methods")
     for family in registry.list_families():
         table.add_row(
             family.id,
+            family.domain,
             family.question,
             registry.load_family(family.parent).name if family.parent else "",
-            ", ".join(registry.algorithms_in_family(family.id)),
+            ", ".join(registry.methods_in_family(family.id)),
         )
     console.print(table)
 
@@ -300,7 +309,7 @@ def family(family_id: str) -> None:
     console.print(f"[bold]{record.question}[/bold]")
     console.print(record.summary.strip())
 
-    members = registry.algorithms_in_family(family_id)
+    members = registry.methods_in_family(family_id)
     console.print(f"\nalgorithms: {', '.join(members) or 'none yet'}")
     if record.related:
         console.print(f"related families: {', '.join(record.related)}")
@@ -329,11 +338,11 @@ def export(
         "families": [f.model_dump(mode="json") for f in registry.list_families()],
         "people": [p.model_dump(mode="json") for p in people.list_people()],
         "algorithms": [
-            registry.load_algorithm(a).model_dump(mode="json", by_alias=True)
-            for a in registry.list_algorithms()
+            registry.load_method(a).model_dump(mode="json", by_alias=True)
+            for a in registry.list_methods()
         ],
         "datasets": [
-            load_graph(d).metadata.model_dump(mode="json") for d in list_datasets()
+            read_metadata(d).model_dump(mode="json") for d in list_datasets()
         ],
     }
     text = json.dumps(document, indent=2, ensure_ascii=False)
@@ -355,7 +364,7 @@ def origin(algorithm: str) -> None:
     """
     from gigi import people
 
-    spec = registry.load_algorithm(algorithm)
+    spec = registry.load_method(algorithm)
     provenance = spec.provenance
 
     console.print(f"[bold]{spec.name}[/bold]")
@@ -399,8 +408,8 @@ def origin(algorithm: str) -> None:
             ("review", spec.credits.reviewers),
         ]
         pairs.extend(
-            (f"{engine} adapter", ids)
-            for engine, ids in sorted(spec.credits.adapter_contributors.items())
+            (f"{backend} adapter", ids)
+            for backend, ids in sorted(spec.credits.adapter_contributors.items())
         )
         for label, ids in pairs:
             if ids:
@@ -443,10 +452,10 @@ def person(person_id: str) -> None:
 
     contributions = Table("algorithm", "contribution", "detail")
     for contribution in profile.contributions:
-        contributions.add_row(contribution.algorithm_id, contribution.role, contribution.detail)
+        contributions.add_row(contribution.method_id, contribution.role, contribution.detail)
     console.print(contributions)
 
     if profile.discoveries:
         console.print("\n[bold]Divergences found[/bold]")
         for discovery in profile.discoveries:
-            console.print(f"  {discovery.algorithm_id}: {discovery.detail}")
+            console.print(f"  {discovery.method_id}: {discovery.detail}")

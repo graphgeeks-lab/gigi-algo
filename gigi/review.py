@@ -22,7 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from gigi import knownanswers, registry, requirements
-from gigi.graph import list_datasets
+from gigi.data import list_datasets
 from gigi.harness import verify
 
 
@@ -48,7 +48,7 @@ class ByEye:
 class Review:
     """One algorithm's review: what is settled, what is absent, what is left."""
 
-    algorithm_id: str
+    method_id: str
     maturity: str
     checks: list[Check] = field(default_factory=list)
     gaps: list[str] = field(default_factory=list)
@@ -64,10 +64,10 @@ class Review:
         return not self.failed
 
 
-def review(algorithm_id: str) -> Review:
+def review(method_id: str) -> Review:
     """Assemble the review for one algorithm."""
-    spec = registry.load_algorithm(algorithm_id)
-    result = Review(algorithm_id=algorithm_id, maturity=spec.maturity.value)
+    spec = registry.load_method(method_id)
+    result = Review(method_id=method_id, maturity=spec.maturity.value)
 
     # --- the requirements of the tier it claims -----------------------------
     for outcome in requirements.check(spec):
@@ -82,9 +82,9 @@ def review(algorithm_id: str) -> Review:
             )
 
     # --- what happened when it was run ---------------------------------------
-    cases = knownanswers.load_cases(algorithm_id)
+    cases = knownanswers.load_cases(method_id)
     failed_cases = [
-        r for r in (knownanswers.run_case(algorithm_id, c) for c in cases) if not r.passed
+        r for r in (knownanswers.run_case(method_id, c) for c in cases) if not r.passed
     ]
     result.checks.append(
         Check(
@@ -99,7 +99,7 @@ def review(algorithm_id: str) -> Review:
     report = verify(spec, allow_frontier=True)
     result.checks.append(
         Check(
-            "engines agree where the registry says they agree",
+            "backends agree where the registry says they agree",
             not report.undeclared_differences,
             f"{len(report.runs)} runs, {len(report.explained_differences)} explained, "
             f"{len(report.undeclared_differences)} undeclared",
@@ -130,17 +130,22 @@ def review(algorithm_id: str) -> Review:
     )
 
     # --- absences worth noticing ---------------------------------------------
-    implemented = set(registry.implemented_engines(algorithm_id))
-    for engine in sorted(set(registry.ENGINE_NAMES) - implemented):
-        result.gaps.append(f"no {engine} implementation yet")
-    uncovered = sorted(set(list_datasets()) - set(spec.datasets))
+    implemented = set(registry.implemented_backends(method_id))
+    for backend in sorted(set(registry.plausible_backends(spec)) - implemented):
+        result.gaps.append(f"no {backend} implementation yet")
+    # Only fixtures this method could actually consume. Telling a vector
+    # measure it has not been run against a graph is noise, and noise in a
+    # gap list is how gap lists stop being read.
+    kinds = {str(i.kind) for i in spec.inputs}
+    candidates = {d for kind in kinds for d in list_datasets(kind)}
+    uncovered = sorted(candidates - set(spec.datasets))
     if uncovered:
         result.gaps.append(f"not run against: {', '.join(uncovered)}")
     for choice in spec.maths.under_determined:
         if not choice.divergences and not choice.datasets:
             result.gaps.append(
                 f"choice point {choice.id!r} has no fixture -- nothing tests which "
-                f"answer the engines chose"
+                f"answer the backends chose"
             )
     for check in report.divergence_checks:
         if check.observed == "skipped":
@@ -152,36 +157,36 @@ def review(algorithm_id: str) -> Review:
         [f"{o.requirement.description}: {o.detail}" for o in lacking],
     )
 
-    result.by_eye = _by_eye(spec, algorithm_id)
+    result.by_eye = _by_eye(spec, method_id)
     return result
 
 
-def _by_eye(spec, algorithm_id: str) -> list[ByEye]:
+def _by_eye(spec, method_id: str) -> list[ByEye]:
     """Short on purpose. A checklist nobody finishes protects nothing."""
     items = [
         ByEye(
             question="Does the reference implementation compute what the definition says?",
-            where=f"algorithms/{algorithm_id}/implementations/reference.py "
+            where=f"algorithms/{method_id}/implementations/reference.py "
             f"beside `maths.definition`",
-            why="It is the oracle every engine is checked against. The known-answer "
+            why="It is the oracle every backend is checked against. The known-answer "
             "cases check it against hand-derived values; you check the rest.",
         ),
         ByEye(
             question="Are the known answers really derived, not observed?",
-            where=f"algorithms/{algorithm_id}/tests/expected.yaml, the `derived` fields",
+            where=f"algorithms/{method_id}/tests/expected.yaml, the `derived` fields",
             why="A case whose expected value came from running the code checks "
             "the code against itself. Read each derivation and ask whether you "
             "could have reached the number without the software.",
         ),
         ByEye(
             question="Could someone learn the algorithm from the reference implementation?",
-            where=f"algorithms/{algorithm_id}/implementations/reference.py",
+            where=f"algorithms/{method_id}/implementations/reference.py",
             why="It is a teaching artifact as much as an oracle. If it needs a "
             "comment to explain a trick, the trick probably does not belong.",
         ),
         ByEye(
             question="Do maths.md and the `maths:` block say the same thing?",
-            where=f"algorithms/{algorithm_id}/maths.md",
+            where=f"algorithms/{method_id}/maths.md",
             why="The one seam in the design that nothing verifies. They are "
             "reviewed together or they drift.",
         ),
@@ -190,8 +195,8 @@ def _by_eye(spec, algorithm_id: str) -> list[ByEye]:
     if spec.divergences:
         items.append(
             ByEye(
-                question="Is each divergence the engine's behaviour, and not our bug?",
-                where=f"algorithms/{algorithm_id}/notes.md",
+                question="Is each divergence the backend's behaviour, and not our bug?",
+                where=f"algorithms/{method_id}/notes.md",
                 why="A divergence entry accuses a library of doing something "
                 "surprising. It should say why that is the library's choice -- or "
                 "say plainly that the rule could not be derived.",
@@ -202,7 +207,7 @@ def _by_eye(spec, algorithm_id: str) -> list[ByEye]:
         items.append(
             ByEye(
                 question="Is the attribution honest -- precursors real, nothing overclaimed?",
-                where="`provenance` in algorithm.yaml",
+                where="`provenance` in method.yaml",
                 why="Contested credit belongs in attribution_notes rather than "
                 "being resolved silently in our favour.",
             )
@@ -216,7 +221,7 @@ def _by_eye(spec, algorithm_id: str) -> list[ByEye]:
                     "Does this algorithm answer the family's question -- "
                     f'"{family.question.rstrip("?")}"?'
                 ),
-                where="`family` in algorithm.yaml",
+                where="`family` in method.yaml",
                 why="A family is a question, not a label. If the answer is no, "
                 "the family is wrong even when the label sounds right.",
             )

@@ -5,8 +5,8 @@
 ## Context
 
 The PRD specifies Apache Arrow / Parquet as the neutral data layer. Arrow is the
-right in-memory choice: it is engine-neutral, cheap to convert from, and lets us
-measure conversion cost per engine. Parquet on disk is a worse fit for the
+right in-memory choice: it is backend-neutral, cheap to convert from, and lets us
+measure conversion cost per backend. Parquet on disk is a worse fit for the
 fixtures we actually have, because a maintainer reviewing a pull request cannot
 see what changed inside a binary file.
 

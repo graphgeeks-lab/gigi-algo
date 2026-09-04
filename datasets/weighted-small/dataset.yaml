@@ -1,0 +1,23 @@
+id: weighted-small
+kind: graph
+description: >
+  Directed graph with a `weight` column and deliberately skewed weights, so
+  that weighted and unweighted PageRank do not merely differ in the sixth
+  decimal place -- they rank the nodes differently. Every node has an outgoing
+  edge, so nothing here is confounded by dangling-node handling.
+directed: true
+node_id: id
+edges:
+  source: source
+  target: target
+  weight: weight
+features:
+  weighted: true
+  dangling_nodes: false
+  disconnected: false
+  self_loops: false
+  duplicate_edges: false
+expected:
+  nodes: 3
+  edges: 5
+license: CC0

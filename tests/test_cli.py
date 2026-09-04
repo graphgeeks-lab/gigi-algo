@@ -39,7 +39,7 @@ def test_run_writes_state_and_prints_scores():
     from gigi import runstore
 
     result = runner.invoke(
-        app, ["run", "pagerank", "--graph", "tiny-directed", "--engine", "reference"]
+        app, ["run", "pagerank", "--graph", "tiny-directed", "--backend", "reference"]
     )
     assert result.exit_code == 0
     assert runstore.last_run() is not None
@@ -154,7 +154,7 @@ def test_version_json_is_machine_readable():
     result = runner.invoke(app, ["version", "--json"])
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert {"gigi", "python", "registry", "counts", "engines"} <= set(payload)
+    assert {"gigi", "python", "registry", "counts", "backends"} <= set(payload)
     assert payload["counts"]["algorithms"] >= 1
     assert payload["registry"]["packaged"] is False
 
@@ -162,11 +162,11 @@ def test_version_json_is_machine_readable():
 def test_promote_dry_run_changes_nothing():
     from gigi import registry
 
-    before = registry.load_algorithm("degree_centrality").maturity
+    before = registry.load_method("degree_centrality").maturity
     result = runner.invoke(app, ["promote", "degree_centrality", "--dry-run"])
     assert result.exit_code == 0
     assert "nothing was changed" in result.output
-    assert registry.load_algorithm("degree_centrality").maturity is before
+    assert registry.load_method("degree_centrality").maturity is before
 
 
 def test_promote_refuses_to_go_backwards():

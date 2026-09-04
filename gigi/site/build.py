@@ -7,14 +7,14 @@ from pathlib import Path
 from gigi import people, registry
 from gigi.harness import verify
 from gigi.maturity import FrontierBlocked
-from gigi.models import AlgorithmSpec, VerificationReport
+from gigi.models import MethodSpec, VerificationReport
 from gigi.runstore import load_report
 from gigi.site.html import INLINE, page
 from gigi.site.pages import algorithm_body, index_body, person_body
 
-def collect(verify_first: bool) -> tuple[list[AlgorithmSpec], dict[str, VerificationReport]]:
+def collect(verify_first: bool) -> tuple[list[MethodSpec], dict[str, VerificationReport]]:
     """Load every spec, and either run verification now or read the last report."""
-    specs = [registry.load_algorithm(a) for a in registry.list_algorithms()]
+    specs = [registry.load_method(a) for a in registry.list_methods()]
     reports: dict[str, VerificationReport] = {}
     for spec in specs:
         try:

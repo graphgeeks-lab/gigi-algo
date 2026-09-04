@@ -1,0 +1,23 @@
+id: undirected-small
+kind: graph
+description: >
+  An undirected triangle with a pendant node. PageRank is well defined on
+  undirected graphs -- each edge is simply traversable both ways -- but not
+  every engine will run it, which is exactly what this fixture is here to find
+  out.
+directed: false
+node_id: id
+edges:
+  source: source
+  target: target
+  weight: null
+features:
+  weighted: false
+  dangling_nodes: false
+  disconnected: false
+  self_loops: false
+  duplicate_edges: false
+expected:
+  nodes: 4
+  edges: 4
+license: CC0

@@ -1,0 +1,40 @@
+id: community_grouping
+name: Community grouping
+domain: graph
+
+question: >
+  Which nodes belong together, in the sense of being more densely connected to
+  each other than to the rest?
+
+description: >
+  Find groups that are internally dense and externally sparse. The question
+  people usually mean when they say "cluster the graph", and the one most
+  often answered by accident with connected components.
+
+  The difference matters and is not subtle: components are about whether a path
+  exists at all, communities about where the connections are concentrated. A
+  social graph is typically one component and many communities. Run components
+  on it and the answer is "everyone is in one group", which is true, useless,
+  and easy to mistake for a failure of the data.
+
+  No method here answers this yet. It is recorded because naming the question a
+  method does *not* answer is the more useful half of `gigi why`.
+
+input_kinds: [graph]
+output_kinds: [partition]
+
+related_problems:
+  - component_membership
+
+ai_context:
+  instructions: >
+    If a user asks to "cluster" or "group" a graph and their graph is connected,
+    they almost certainly mean this rather than components. Say so, and say that
+    Gigi has no verified method for it yet, rather than offering components as a
+    substitute.
+  synonyms:
+    - cluster the graph
+    - find communities
+    - group similar nodes
+    - modularity
+    - who belongs together

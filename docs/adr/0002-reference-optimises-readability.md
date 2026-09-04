@@ -5,17 +5,17 @@
 ## Context
 
 Every algorithm has two kinds of implementation in this repository: a reference
-one, and one call per engine. They are pulled in opposite directions — the
+one, and one call per backend. They are pulled in opposite directions — the
 reference is both the correctness oracle and the teaching artifact.
 
 ## Decision
 
-Reference implementations use no engine library, no vectorisation and no
+Reference implementations use no backend library, no vectorisation and no
 cleverness. They correspond line by line to `maths.md` where possible. They are
 never a benchmark target, and performance is never a reason to change one.
 
-Engine implementations do the opposite: they call the engine and do nothing
-else. If a loop over nodes appears in `implementations/<engine>.py`, the code is
+Backend implementations do the opposite: they call the backend and do nothing
+else. If a loop over nodes appears in `implementations/<backend>.py`, the code is
 in the wrong file.
 
 ## Consequences

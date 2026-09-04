@@ -9,8 +9,8 @@ says about provenance cannot accidentally change what it says about maths.
 from __future__ import annotations
 
 from gigi import people, registry
-from gigi.models import AlgorithmSpec
-from gigi.site.html import FROM_PERSON, Links, esc, status_pill, table
+from gigi.models import MethodSpec
+from gigi.site.html import FROM_PERSON, Links, esc, table
 
 def discovered_by(divergence, links: Links) -> str:
     """Finding a divergence is a contribution in its own right, and the person
@@ -50,8 +50,8 @@ def person_body(profile: people.Profile, links: Links = FROM_PERSON, heading: st
     def _rows(items):
         return [
             [
-                f'<a href="{esc(links.to_algorithm(c.algorithm_id))}">'
-                f"<code>{esc(c.algorithm_id)}</code></a>",
+                f'<a href="{esc(links.to_algorithm(c.method_id))}">'
+                f"<code>{esc(c.method_id)}</code></a>",
                 esc(c.role),
                 f"<code>{esc(c.detail)}</code>" if c.detail else "",
             ]
@@ -80,13 +80,13 @@ def person_body(profile: people.Profile, links: Links = FROM_PERSON, heading: st
 {contributions}
 
 <h2>Divergences found</h2>
-<p class="lede">Differences between engines that this person identified and
+<p class="lede">Differences between backends that this person identified and
 turned into a reproducible, CI-checked claim.</p>
 {discoveries}
 """
 
 
-def maths_section(spec: AlgorithmSpec) -> str:
+def maths_section(spec: MethodSpec) -> str:
     """The maths, shown as plain-text statements with the LaTeX beside them.
 
     No typesetting library: KaTeX needs a stylesheet and font files, and this
@@ -128,7 +128,7 @@ def maths_section(spec: AlgorithmSpec) -> str:
         parts.append(
             "<h3>Invariants</h3>"
             '<p class="lede">Properties the result must satisfy. The checked ones are '
-            "asserted on every engine and every fixture, so the maths is executed "
+            "asserted on every backend and every fixture, so the maths is executed "
             "rather than believed.</p>" + table(["id", "statement", "status", "note"], rows)
         )
 
@@ -138,11 +138,11 @@ def maths_section(spec: AlgorithmSpec) -> str:
             outcome = []
             if choice.divergences:
                 outcome.append(
-                    '<span class="pill bad">engines differ</span> '
+                    '<span class="pill bad">backends differ</span> '
                     + ", ".join(f"<code>{esc(d)}</code>" for d in choice.divergences)
                 )
             elif choice.datasets:
-                outcome.append('<span class="pill ok">engines agree</span>')
+                outcome.append('<span class="pill ok">backends agree</span>')
             outcome.extend(f"<code>{esc(d)}</code>" for d in choice.datasets)
             rows.append(
                 [
@@ -153,8 +153,8 @@ def maths_section(spec: AlgorithmSpec) -> str:
             )
         parts.append(
             "<h3>Where the definition leaves a choice</h3>"
-            '<p class="lede">Divergences record where engines <em>did</em> differ. '
-            "These record where they <em>could</em> — which is what lets a new engine "
+            '<p class="lede">Divergences record where backends <em>did</em> differ. '
+            "These record where they <em>could</em> — which is what lets a new backend "
             "be assessed before it is ever run.</p>"
             + table(["question", "defensible answers", "what we measured"], rows)
         )
@@ -162,15 +162,15 @@ def maths_section(spec: AlgorithmSpec) -> str:
     return "".join(parts)
 
 
-def relationships_section(spec: AlgorithmSpec, links: Links) -> str:
+def relationships_section(spec: MethodSpec, links: Links) -> str:
     """Typed edges to other algorithms, with the conditions that make a
     substitution legitimate."""
     if not spec.relationships:
         return ""
-    known = set(registry.list_algorithms())
+    known = set(registry.list_methods())
     rows = []
     for relationship in spec.relationships:
-        target = relationship.algorithm
+        target = relationship.method
         label = (
             f'<a href="{esc(links.to_algorithm(target))}"><code>{esc(target)}</code></a>'
             if target in known
@@ -193,14 +193,14 @@ def relationships_section(spec: AlgorithmSpec, links: Links) -> str:
     )
 
 
-def family_section(spec: AlgorithmSpec, links: Links) -> str:
+def family_section(spec: MethodSpec, links: Links) -> str:
     """Where this sits in the taxonomy, and what else answers the same question."""
     if not registry.family_exists(spec.family):
         return ""
     lineage = registry.family_lineage(spec.family)
     family = lineage[-1]
     trail = " &rarr; ".join(esc(f.name) for f in lineage)
-    siblings = [a for a in registry.algorithms_in_family(family.id) if a != spec.id]
+    siblings = [a for a in registry.methods_in_family(family.id) if a != spec.id]
     also = (
         " Also here: "
         + ", ".join(
@@ -217,7 +217,7 @@ def family_section(spec: AlgorithmSpec, links: Links) -> str:
 <p>{esc(family.summary.strip())}{also}</p></div>"""
 
 
-def provenance_section(spec: AlgorithmSpec) -> str:
+def provenance_section(spec: MethodSpec) -> str:
     """Where the algorithm came from -- kept visually distinct from who
     implemented it here, because they are different claims with different
     kinds of evidence."""
@@ -270,7 +270,7 @@ def provenance_section(spec: AlgorithmSpec) -> str:
     return "".join(parts)
 
 
-def credits_section(spec: AlgorithmSpec, links: Links) -> str:
+def credits_section(spec: MethodSpec, links: Links) -> str:
     """Who built this entry -- distinct from who created the algorithm."""
     credits = spec.credits
     if not credits.everyone():
@@ -297,8 +297,8 @@ def credits_section(spec: AlgorithmSpec, links: Links) -> str:
         if ids
     ]
     rows.extend(
-        [f"{engine} adapter", _names(ids)]
-        for engine, ids in sorted(credits.adapter_contributors.items())
+        [f"{backend} adapter", _names(ids)]
+        for backend, ids in sorted(credits.adapter_contributors.items())
         if ids
     )
     return f"""<h2>Gigi contributors</h2>

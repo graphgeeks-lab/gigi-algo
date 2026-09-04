@@ -18,18 +18,18 @@ It prints three lists, and the split between them is the whole idea.
 need to verify by hand that:
 
 - the spec validates, the family resolves, every credited person exists;
-- every checkable invariant names a real check, and holds on every engine and
+- every checkable invariant names a real check, and holds on every backend and
   every fixture;
-- the engines agree wherever the registry says they agree, and every declared
+- the backends agree wherever the registry says they agree, and every declared
   divergence still reproduces;
 - relationships are mirrored on the other algorithm;
-- the required files exist and every declared engine has an implementation.
+- the required files exist and every declared backend has an implementation.
 
 That is a lot of correctness you get for free. Spend your attention elsewhere.
 
 ## 2. Gaps — usually not blockers
 
-Absences the tool noticed: an engine with no implementation, a fixture the
+Absences the tool noticed: a backend with no implementation, a fixture the
 algorithm is not run against, a choice point nothing tests, a divergence
 crediting nobody. Most of these are fine in a first contribution and make good
 follow-up issues. Ask about them; do not block on them unless the gap
@@ -41,7 +41,7 @@ Short on purpose. A checklist nobody finishes protects nothing.
 
 ### Does the reference implementation compute what the definition says?
 
-**The one that matters most.** The reference is the oracle every engine is
+**The one that matters most.** The reference is the oracle every backend is
 compared against, so if it is wrong, every green check above is meaningless.
 Nothing automated can check this.
 
@@ -67,14 +67,14 @@ It is a teaching artifact as much as an oracle ([ADR
 structured block can drift apart silently, and only review catches it. Read
 them together, always.
 
-### Is each divergence the engine's behaviour, and not our bug?
+### Is each divergence the backend's behaviour, and not our bug?
 
 A divergence entry is a public claim that a library does something surprising.
 Before accepting one:
 
-- Does `notes.md` explain *why* the engine behaves that way? "NetworkX defaults
+- Does `notes.md` explain *why* the backend behaves that way? "NetworkX defaults
   to `weight='weight'`" is an explanation; "NetworkX is wrong" is not.
-- Could our adapter be causing it? Check `implementations/<engine>.py` for a
+- Could our adapter be causing it? Check `implementations/<backend>.py` for a
   parameter we passed that we should not have.
 - Does the `detect` block reproduce the *claim*, or something adjacent?
 

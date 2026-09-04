@@ -1,7 +1,7 @@
 [project]
 name = "gigi-algo"
 version = "0.1.0"
-description = "An executable registry of graph algorithm semantics: run the same algorithm across engines and see where they disagree."
+description = "An executable registry of graph algorithm semantics: run the same algorithm across backends and see where they disagree."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
@@ -31,15 +31,25 @@ dependencies = [
 networkx = ["networkx>=3.0", "scipy>=1.10"]
 igraph = ["python-igraph>=0.11"]
 rustworkx = ["rustworkx>=0.14"]
+# Vector backends. Not graph libraries -- see docs/ONTOLOGY.md.
+scipy = ["scipy>=1.10"]
+sklearn = ["scikit-learn>=1.3"]
 # PDF export of algorithm entries. The .typ source never needs this.
 docs = ["typst>=0.13"]
-all = ["networkx>=3.0", "scipy>=1.10", "python-igraph>=0.11", "rustworkx>=0.14"]
+all = [
+    "networkx>=3.0",
+    "scipy>=1.10",
+    "python-igraph>=0.11",
+    "rustworkx>=0.14",
+    "scikit-learn>=1.3",
+]
 dev = [
     "pytest>=8.0",
     "networkx>=3.0",
     "scipy>=1.10",
     "python-igraph>=0.11",
     "rustworkx>=0.14",
+    "scikit-learn>=1.3",
     "typst>=0.13",
 ]
 
@@ -62,13 +72,16 @@ packages = ["gigi"]
 # empty. It ships under gigi/_content/ and gigi.paths falls back to it when
 # there is no checkout to walk up to.
 [tool.hatch.build.targets.wheel.force-include]
-algorithms = "gigi/_content/algorithms"
+methods = "gigi/_content/methods"
 datasets = "gigi/_content/datasets"
+problems = "gigi/_content/problems"
 families = "gigi/_content/families"
+domains = "gigi/_content/domains"
+semantics = "gigi/_content/semantics"
 people = "gigi/_content/people"
 
 [tool.hatch.build.targets.sdist]
-include = ["gigi", "algorithms", "datasets", "families", "people", "tests", "docs",
+include = ["gigi", "methods", "datasets", "families", "domains", "people", "tests", "docs",
            "README.md", "CHANGELOG.md", "CITATION.cff", "CONTRIBUTING.md", "PLAN.md"]
 
 [tool.pytest.ini_options]

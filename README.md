@@ -2,14 +2,14 @@
 
 **An executable registry of graph algorithm semantics.**
 
-The same named graph algorithm can return different answers on different engines, because their defaults and semantics differ. Gigi writes those differences down, and then runs them, so the write-up cannot quietly become untrue.
+The same named graph algorithm can return different answers on different backends, because their defaults and semantics differ. Gigi writes those differences down, and then runs them, so the write-up cannot quietly become untrue.
 
 Here is one, measured by this repository's own test suite:
 
 ```
 PageRank, weighted-small, no parameters given
 
-  engine       a          b          c
+  backend       a          b          c
   reference    0.233918   0.333333   0.432749
   networkx     0.118150   0.400793   0.481057    <- 49% off, silently
   igraph       0.233918   0.333333   0.432749
@@ -36,10 +36,10 @@ gigi people                                        # who has contributed, and to
 gigi export -o registry.json                       # the whole registry, for machines
 gigi review pagerank                               # what to check before merging
 gigi promote degree_centrality --dry-run           # has it earned the next tier?
-gigi version                                       # build, engines, and which registry
+gigi version                                       # build, backends, and which registry
 gigi typst pagerank --pdf                          # a printable, citable PDF of the entry
 gigi typst pagerank --pdf --review                 # same, with the open questions in the margin
-gigi engines                                       # what is installed here
+gigi backends                                       # what is installed here
 gigi inspect datasets/weighted-small               # cheap structural facts
 gigi compare pagerank -g weighted-small --defaults # reproduce the table above
 gigi verify pagerank                               # check every claim
@@ -52,7 +52,7 @@ The Python API is the same thing without the terminal:
 import gigi
 
 graph  = gigi.load_graph("datasets/weighted-small")
-result = gigi.run("pagerank", engine="networkx", graph=graph)
+result = gigi.run("pagerank", backend="networkx", graph=graph)
 
 result.requested_parameters   # {'damping': 0.85, 'weight_property': None, ...}
 result.effective_parameters   # {'alpha': 0.85, 'weight': 'weight', 'tol': 1e-06, ...}
@@ -66,57 +66,79 @@ The CLI, the Python API, and any future agent tooling call the same three functi
 ## How it works
 
 ```
-algorithms/pagerank/algorithm.yaml     the claims
+methods/pagerank/method.yaml     the claims
         │
-        ├── implementations/           one small file per engine
+        ├── implementations/           one small file per backend
         │
 datasets/*/                            small adversarial fixtures
         │
         ▼
 gigi verify pagerank                   runs the claims
         │
-        ├── engines agree where the registry says they agree, or CI fails
+        ├── backends agree where the registry says they agree, or CI fails
         └── every declared divergence still reproduces, or CI fails
 ```
 
 Two independent questions, deliberately never mixed:
 
-1. **Agreement.** With every ambiguous parameter pinned, do the engines match the reference implementation? A difference nothing in the registry accounts for is a build failure.
+1. **Agreement.** With every ambiguous parameter pinned, do the backends match the reference implementation? A difference nothing in the registry accounts for is a build failure.
 2. **Reproduction.** Does each declared divergence still happen? A divergence that stopped happening is stale documentation, and is also a build failure.
 
-That second check is what turns an engine upgrade into a signal instead of a surprise.
+That second check is what turns a backend upgrade into a signal instead of a surprise.
 
 ## What is in v0.1
 
 | | |
 |---|---|
-| Algorithms | `pagerank`, `degree_centrality` |
-| Engines | `reference`, `networkx`, `igraph`, `rustworkx` |
-| Fixtures | 9 small adversarial graphs, including `empty` and `single-node` |
-| Divergences | 5, all reproduced by CI |
-| Output kinds | `node_score` |
-| Invariants | 7, checked on every engine and fixture |
-| Known answers | 18 hand-derived cases the reference must reproduce |
-| Families | 16, covering the roadmap |
+| Methods | `pagerank`, `degree_centrality`, `cosine_similarity` |
+| Backends | `reference`, `networkx`, `igraph`, `rustworkx`, `scipy`, `sklearn` |
+| Fixtures | 10 small adversarial graphs and 3 vector sets, including the degenerate cases of each |
+| Divergences | 7, all reproduced by CI |
+| Output kinds | `node_score`, `similarity_score` |
+| Invariants | 10, checked on every backend and fixture |
+| Known answers | 25 hand-derived cases the reference must reproduce |
+| Families | 17 across 2 domains, covering the roadmap |
 | Attribution | three layers: origin, Gigi credits, divergence discovery |
 
 Coming next: `connected_components` and `bfs`, which bring partition and path comparison.
+
+### Not only graphs
+
+`cosine_similarity` is here for a reason that is not "more content". Everything
+Gigi does well — layered provenance, executed invariants, named choice points,
+reproduced divergences, a priced maturity ladder — is about a *method*, not
+about a graph, and until PR 2b that was a claim rather than a fact.
+
+It is now one method's worth of fact. A fixture declares its kind (`graph` or
+`vectors`); a backend declares what it accepts; a result is keyed by node or by
+pair. The harness is still three functions and gained no branch on kind.
+
+It found something on its first fixture. A zero vector has no direction, so the
+cosine of any pair involving one is undefined — and SciPy answers `NaN`,
+scikit-learn answers `0.0`, and the reference declines to answer. The
+scikit-learn convention is the quieter and the more dangerous: a failed
+embedding is reported as *known to be dissimilar to everything*, when the truth
+is that nothing is known about it.
+
+The headline still says *graph algorithm semantics*, and will until the
+non-graph content is more than one entry. See
+[ADR 0011](docs/adr/0011-a-dataset-declares-its-kind.md).
 
 ## Contributing
 
 Adding an algorithm means adding one directory. You do not touch `gigi/`, and you do not write any tests — the conformance suite is generated from the registry, so a new directory is covered automatically.
 
 ```
-algorithms/<your_algorithm>/
-├── algorithm.yaml            what you claim, where it came from, who built it
+methods/<your_method>/
+├── method.yaml            what you claim, where it came from, who built it
 ├── maths.md                  the definition
 ├── notes.md                  what you measured
 └── implementations/
     ├── reference.py          readable oracle, no libraries
-    └── networkx.py           ~15 lines: call the engine, record its defaults
+    └── networkx.py           ~15 lines: call the backend, record its defaults
 ```
 
-`algorithms/_template/` is a **working example**, it implements degree centrality end to end, so you can run it before you change anything, and CI runs it too so it cannot rot. See [CONTRIBUTING.md](CONTRIBUTING.md).
+`methods/_template/` is a **working example**, it implements degree centrality end to end, so you can run it before you change anything, and CI runs it too so it cannot rot. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 **You do not need to invent a graph algorithm to contribute.** Reporting a divergence, correcting an attribution, or adding an adversarial fixture needs no Python at all, and all three improve a registry whose entire value is being correct.
 
@@ -157,7 +179,7 @@ By eye -- nothing checks these but you
   ...
 ```
 
-That first by-eye item is the one that matters: the reference implementation is the oracle every engine is compared against, so if it is wrong, every green check above it is meaningless. `tests/expected.yaml` is the partial defence -- known answers derived by hand, from the definition, which the reference must reproduce -- and the command prints the definition so you can check the rest.
+That first by-eye item is the one that matters: the reference implementation is the oracle every backend is compared against, so if it is wrong, every green check above it is meaningless. `tests/expected.yaml` is the partial defence -- known answers derived by hand, from the definition, which the reference must reproduce -- and the command prints the definition so you can check the rest.
 
 Maturity is priced. `gigi/requirements.py` says what `frontier`, `emerging` and `stable` each owe, `gigi review` shows exactly what promotion would take, and the test suite refuses an entry claiming a tier it has not earned.
 
@@ -166,11 +188,41 @@ Readability is itself a checked property. `tests/test_readability.py` enforces n
 ## Installing a release
 
 ```bash
-pip install gigi-algo            # library, CLI, reference engine
+pip install gigi-algo            # library, CLI, reference backend
 pip install "gigi-algo[all]"     # plus NetworkX, igraph and rustworkx
 ```
 
-Releases are tags. `uv version --bump minor`, a changelog section, `git tag`, and the workflow builds, tests on two engine matrices, publishes to PyPI by trusted publishing, and writes the GitHub Release from the changelog -- only after PyPI confirms the version is installable. See [docs/RELEASING.md](docs/RELEASING.md) and [CHANGELOG.md](CHANGELOG.md).
+Releases are tags. `uv version --bump minor`, a changelog section, `git tag`, and the workflow builds, tests on two backend matrices, publishes to PyPI by trusted publishing, and writes the GitHub Release from the changelog -- only after PyPI confirms the version is installable. See [docs/RELEASING.md](docs/RELEASING.md) and [CHANGELOG.md](CHANGELOG.md).
+
+## Does it read your data the way you mean it?
+
+The same column can be the right input to two methods and mean opposite things
+to them. PageRank reads an edge weight as **strength** — higher is a stronger
+relationship. Dijkstra reads it as **cost** — higher is worse. Run both on a
+column called `distance` and you have asked two contradictory questions and
+been told nothing.
+
+```console
+$ gigi why pagerank --graph road-distances-small
+
+Answers
+  Which nodes are important because other important nodes point at them?
+
+Does not answer
+  Which nodes have the most connections?   -> degree_centrality
+  What is the cheapest way to get from here to there?   -> nothing here yet
+
+How it reads edge weight
+  as strength: higher means stronger
+
+Your data  (road-distances-small)
+  ! Column `distance` looks like distance, and this method reads it as
+    strength, where higher means stronger. Did you intend to invert it?
+```
+
+Without `--graph` that is documentation. With it, it is advice: it reads the
+columns actually in front of you. `gigi alternatives` and `gigi related` come
+from the same structure.
 
 ## Maturity
 
@@ -195,19 +247,22 @@ The short version lives in [docs/adr/](docs/adr/):
 - [Arrow in memory, CSV on disk](docs/adr/0001-arrow-in-memory-csv-on-disk.md) — fixtures must be reviewable in a diff
 - [Reference implementations optimise for readability](docs/adr/0002-reference-optimises-readability.md)
 - [The graph data contract](docs/adr/0003-graph-data-contract.md) — nulls rejected, duplicates and self loops preserved
-- [Engine defaults are never hidden](docs/adr/0004-engine-defaults-are-never-hidden.md)
+- [Backend defaults are never hidden](docs/adr/0004-backend-defaults-are-never-hidden.md)
 - [Divergence claims must be executable](docs/adr/0005-divergence-claims-must-be-executable.md)
 - [Maturity gates strictness](docs/adr/0006-maturity-gates-strictness.md)
 - [Attribution has layers](docs/adr/0007-attribution-has-layers.md) — never a single `inventor:` field
 - [Machine-readable first](docs/adr/0008-machine-readable-first.md) — the next reader may not be a person
+- [Known answers and the ladder](docs/adr/0009-known-answers-and-the-ladder.md) — the oracle's only independent check
+- [General schema, narrow content](docs/adr/0010-general-schema-narrow-content.md) — graph content, method-shaped schema
+- [A dataset declares its kind](docs/adr/0011-a-dataset-declares-its-kind.md) — and a backend says what it takes
 
 ## Built for readers who are not people
 
 An agent choosing an algorithm cannot read `maths.md`, and should not be asked to infer facts from prose. So every fact lives in structured form, and prose supplements it rather than carrying it alone:
 
 - **`maths:`** — the definition in plain text and LaTeX, the invariants, and the places the definition leaves a choice open.
-- **`invariants`** are *executed*. "Scores sum to one" is two lines of YAML, and it is then asserted on every engine, on every fixture, forever. A property whose id names no check in `gigi/invariants.py` fails the build.
-- **`under_determined`** names the choice points, where engines *could* differ, as opposed to `divergences`, which records where they *did*. That is what lets a new engine be assessed before it is ever run.
+- **`invariants`** are *executed*. "Scores sum to one" is two lines of YAML, and it is then asserted on every backend, on every fixture, forever. A property whose id names no check in `gigi/invariants.py` fails the build.
+- **`under_determined`** names the choice points, where backends *could* differ, as opposed to `divergences`, which records where they *did*. That is what lets a new backend be assessed before it is ever run.
 - **`relationships`** are typed and conditioned. "See also" tells a machine nothing; "generalises eigenvector centrality, and coincides with it as damping approaches 1 on a strongly connected graph" tells it when a substitution is legitimate.
 - **`family`** resolves to `families/families.yaml`, where a family is a *question* ("Which nodes matter, and in what sense of matter?") rather than a label.
 
@@ -217,7 +272,7 @@ See [ADR 0008](docs/adr/0008-machine-readable-first.md).
 
 ## What Gigi is not
 
-Not a graph engine. Not a graph database. Not a query language. Gigi does not implement fast kernels and it never reimplements NetworkX, igraph or rustworkx inside an adapter — it calls them, records exactly what they did, and tells you where they disagree.
+Not a graph backend. Not a graph database. Not a query language. Gigi does not implement fast kernels and it never reimplements NetworkX, igraph or rustworkx inside an adapter — it calls them, records exactly what they did, and tells you where they disagree.
 
 ## Licence
 

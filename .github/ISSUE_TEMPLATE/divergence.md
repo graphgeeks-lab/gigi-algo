@@ -1,6 +1,6 @@
 ---
 name: Report a divergence
-about: Two engines disagree about the same algorithm
+about: Two backends disagree about the same algorithm
 labels: good-first-divergence
 ---
 
@@ -8,7 +8,7 @@ labels: good-first-divergence
      registry entry together. -->
 
 **Algorithm:**
-**Engines:**
+**Backends:**
 **Dataset or graph:**
 
 ## What you ran
@@ -16,9 +16,9 @@ labels: good-first-divergence
 ```python
 ```
 
-## What each engine returned
+## What each backend returned
 
-| engine | version | result |
+| backend | version | result |
 |---|---|---|
 |  |  |  |
 

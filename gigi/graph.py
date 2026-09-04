@@ -1,6 +1,6 @@
 """The neutral graph layer: Arrow in memory, CSV or Parquet on disk.
 
-Gigi does not build a graph engine. `GraphData` is a dataset container that
+Gigi does not build a graph backend. `GraphData` is a dataset container that
 every adapter converts from; it has no adjacency structure of its own.
 
 On-disk fixtures are CSV by default because a maintainer must be able to see
@@ -21,7 +21,7 @@ import yaml
 from gigi.models import EdgeColumns, GraphMetadata, GraphProfile
 from gigi.paths import datasets_dir
 
-# Node identifiers are canonicalised to strings. Engines disagree about integer
+# Node identifiers are canonicalised to strings. Backends disagree about integer
 # vs string keys, and that is not a divergence worth reporting -- it is noise.
 NODE_ID_TYPE = "string"
 
@@ -98,9 +98,9 @@ def load_graph(path: str | Path) -> GraphData:
         else:
             raise DatasetError(f"no dataset directory at {path}")
 
-    manifest = directory / "graph.yaml"
+    manifest = directory / "dataset.yaml"
     if not manifest.is_file():
-        raise DatasetError(f"{directory} has no graph.yaml")
+        raise DatasetError(f"{directory} has no dataset.yaml")
     metadata = GraphMetadata.model_validate(
         yaml.safe_load(manifest.read_text(encoding="utf-8"))
     )
@@ -136,12 +136,12 @@ def _check_expected_counts(directory: Path, graph: GraphData) -> None:
     expected = graph.metadata.expected
     if "edges" in expected and graph.edges.num_rows != expected["edges"]:
         raise DatasetError(
-            f"{directory}: graph.yaml expects {expected['edges']} edges, "
+            f"{directory}: dataset.yaml expects {expected['edges']} edges, "
             f"found {graph.edges.num_rows}"
         )
     if "nodes" in expected and len(graph.node_ids) != expected["nodes"]:
         raise DatasetError(
-            f"{directory}: graph.yaml expects {expected['nodes']} nodes, "
+            f"{directory}: dataset.yaml expects {expected['nodes']} nodes, "
             f"found {len(graph.node_ids)}"
         )
 
@@ -178,13 +178,6 @@ def graph_from_edges(
         else None
     )
     return GraphData(edges=pa.table(columns, schema=schema), metadata=metadata, nodes=node_table)
-
-
-def list_datasets() -> list[str]:
-    root = datasets_dir()
-    if not root.is_dir():
-        return []
-    return sorted(p.name for p in root.iterdir() if (p / "graph.yaml").is_file())
 
 
 def profile_graph(graph: GraphData) -> GraphProfile:

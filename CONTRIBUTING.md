@@ -1,6 +1,6 @@
 # Contributing
 
-The most valuable contribution is an algorithm with its engine implementations and an honest account of where the engines disagree. That takes one directory and no test-writing.
+The most valuable contribution is an algorithm with its backend implementations and an honest account of where the backends disagree. That takes one directory and no test-writing.
 
 ## Setup
 
@@ -11,7 +11,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Engines are optional extras. If you only have NetworkX installed, the suite skips igraph and rustworkx rather than failing — you can contribute usefully without installing all four.
+Backends are optional extras. If you only have NetworkX installed, the suite skips igraph and rustworkx rather than failing — you can contribute usefully without installing all four.
 
 ```bash
 pip install -e ".[networkx]"          # just one
@@ -44,12 +44,12 @@ Every id referenced from an algorithm must resolve, or the test suite fails. The
 ## Adding an algorithm
 
 ```bash
-cp -r algorithms/_template algorithms/betweenness_centrality
+cp -r methods/_template methods/betweenness_centrality
 ```
 
 The template is a **working example** — degree centrality, running end to end. Run it first, then replace it a piece at a time.
 
-**1. Fill in `algorithm.yaml`.** Nothing needs registering anywhere else; the directory *is* the registration. Set `maturity: emerging` to start.
+**1. Fill in `method.yaml`.** Nothing needs registering anywhere else; the directory *is* the registration. Set `maturity: emerging` to start.
 
 **1b. Fill in `provenance:` and `gigi:`.** These answer two different questions and must not be merged.
 
@@ -77,6 +77,61 @@ Resist `inventor: <one name>`. Most algorithms have precursors and independent d
 
 Getting an attribution *right* is a real contribution, and one that needs no Python.
 
+**1b-ii. Name the problem, and the ones you are mistaken for.**
+
+A problem is a question stated without reference to any method, in
+`problems/<id>.yaml`. Name the ones you solve, and -- more useful to a reader --
+the ones people will reach for you by mistake:
+
+```yaml
+problems:
+  - recursive_node_influence
+
+intent:
+  not_for:
+    - simple_node_importance      # they mean "most connections"
+    - cheapest_route              # they mean "shortest path"
+```
+
+`gigi why` prints those questions under *does not answer*, with whatever does
+answer them. A method that names no problem cannot be recommended, and
+`emerging` requires one.
+
+**1b-iii. Say how you read your input.**
+
+The part nothing else in the ecosystem does. If any value your method consumes
+is open to interpretation, say what you make of it:
+
+```yaml
+parameters:
+  - name: weight_property
+    semantic_role: strength         # or: cost, capacity, probability...
+    interpretation:
+      higher_means: stronger
+
+semantic_interpretations:
+  - id: weighted_edge_strength
+    subject: edge_weight
+    semantic_role: strength
+    higher_means: stronger
+    description: >
+      A larger edge value produces a stronger transition probability.
+    common_domain_meanings:
+      - meaning: relationship_strength
+        fit: strong
+      - meaning: distance
+        fit: dangerous
+        note: >
+          Backwards: a 100 km edge would be read as a hundred times stronger
+          than a 1 km edge.
+```
+
+`gigi why <method> --graph <data>` then compares that against the columns a
+user actually has, and asks. Meanings come from
+`semantics/column_meanings.yaml`; a meaning not in that file can never be
+inferred, and the test suite says so. Mark a reading `dangerous` only with a
+note explaining why -- an alarm without a reason gets ignored.
+
 **1c. Fill in `maths:` and pick a `family:`.**
 
 `maths.md` is prose for people; the `maths:` block is the same content in a form a verifier or an agent can use. Both, not either.
@@ -90,19 +145,19 @@ maths:
       Plain text that renders in a terminal.
     latex: 'C(v) = \frac{\deg(v)}{n - 1}'
 
-  invariants:                       # these are EXECUTED, on every engine
+  invariants:                       # these are EXECUTED, on every backend
     - id: scores_non_negative       # must name a check in gigi/invariants.py
       statement: "C(v) >= 0 for every v"
       check: true
 
-  under_determined:                 # where engines could differ
+  under_determined:                 # where backends could differ
     - id: degree_direction
       question: On a directed graph, does "degree" mean in, out, or both?
       choices: [both, in-degree only, out-degree only]
       datasets: [tiny-directed]       # what settles which answer they chose
 ```
 
-Invariants are the best value in the whole file. Two lines of YAML get asserted on every engine, on every fixture, forever. If the property you want is not in `gigi/invariants.py`, add it — one function and one line in `CHECKS`.
+Invariants are the best value in the whole file. Two lines of YAML get asserted on every backend, on every fixture, forever. If the property you want is not in `gigi/invariants.py`, add it — one function and one line in `CHECKS`.
 
 `under_determined` is where you think *before* running anything: name the places the definition leaves a choice, and you have written the test plan for the divergences you are about to look for.
 
@@ -122,13 +177,13 @@ relationships:
 
 If the other algorithm exists, the relationship must be mirrored there with the inverse kind, and CI checks it. `equivalent_under` without a `condition` is rejected: an unconditioned equivalence claim is not usable.
 
-**2. Write `implementations/reference.py`.** No engine libraries, no vectorisation. It should read like `maths.md`. It is the oracle every engine is checked against, so correctness matters and speed does not.
+**2. Write `implementations/reference.py`.** No backend libraries, no vectorisation. It should read like `maths.md`. It is the oracle every backend is checked against, so correctness matters and speed does not.
 
 ```bash
-gigi run betweenness_centrality --graph tiny-directed --engine reference
+gigi run betweenness_centrality --graph tiny-directed --backend reference
 ```
 
-**3. Add engines one at a time.** Each file is a few lines: call the engine, and record what it actually used.
+**3. Add backends one at a time.** Each file is a few lines: call the backend, and record what it actually used.
 
 ```python
 def run(graph, params):
@@ -137,7 +192,7 @@ def run(graph, params):
     return nx.betweenness_centrality(graph.native, **effective), effective
 ```
 
-`effective` is not optional bookkeeping. An engine default nobody wrote down is an engine default nobody can audit, and those defaults are the entire reason this project exists.
+`effective` is not optional bookkeeping. A backend default nobody wrote down is a backend default nobody can audit, and those defaults are the entire reason this project exists.
 
 **4. Compare.**
 
@@ -145,7 +200,7 @@ def run(graph, params):
 gigi compare betweenness_centrality --graph tiny-directed
 ```
 
-**5. When engines disagree, find out why.** Then either fix your implementation, or,  if the engines genuinely differ — record it as a
+**5. When backends disagree, find out why.** Then either fix your implementation, or,  if the backends genuinely differ — record it as a
 divergence with a `detect` block, so CI reproduces the claim on every run:
 
 ```yaml
@@ -153,23 +208,23 @@ divergences:
   - id: networkx-normalized-default
     category: default
     severity: medium
-    engines: [networkx]
+    backends: [networkx]
     summary: >
       NetworkX normalises betweenness by default; igraph does not.
     consequence: >
       Scores differ by a factor of (n-1)(n-2)/2 with no warning.
     detect:
       datasets: [tiny-directed]         # every fixture it reproduces on
-      engines: [reference, networkx]    # baseline first, subject second
-      parameters: {}                    # {} means "engine defaults"
+      backends: [reference, networkx]    # baseline first, subject second
+      parameters: {}                    # {} means "backend defaults"
       expect: differ                    # differ | match | error
 ```
 
-**When they agree, say so in `notes.md`.** Verified agreement is a real result. "All four engines redistribute dangling mass uniformly, checked to 1e-13" is information somebody currently has to rediscover by hand.
+**When they agree, say so in `notes.md`.** Verified agreement is a real result. "All four backends redistribute dangling mass uniformly, checked to 1e-13" is information somebody currently has to rediscover by hand.
 
 **6. Write `tests/expected.yaml` -- the one test file you write, in YAML.**
 
-Every other test compares engines against your reference implementation. If the reference is wrong, they all pass anyway. Known answers are the guard:
+Every other test compares backends against your reference implementation. If the reference is wrong, they all pass anyway. Known answers are the guard:
 
 ```yaml
 cases:
@@ -182,7 +237,7 @@ cases:
     expected: {a: 1.0, b: 1.0, c: 1.0}
 ```
 
-`derived` is required and is the point: it says where the number came from -- symmetry, a closed form, a hand count, a worked example in a paper. Never "I ran  the code". A case derived by running the code checks the code against itself. Name a `dataset:` instead of an inline `graph:` when you want the case to run on every engine too. `emerging` needs two cases; `stable` needs four.
+`derived` is required and is the point: it says where the number came from -- symmetry, a closed form, a hand count, a worked example in a paper. Never "I ran  the code". A case derived by running the code checks the code against itself. Name a `dataset:` instead of an inline `graph:` when you want the case to run on every backend too. `emerging` needs two cases; `stable` needs four.
 
 **7. Run the suite.**
 
@@ -200,7 +255,7 @@ One price list, in `gigi/requirements.py`. `gigi review <algorithm>` shows which
 |---|---|
 | `frontier` | a reference implementation; family and people resolve |
 | `emerging` | the maths is stated; one invariant asserted on every run; two known answers, each with a real `derived`; divergences credited; `notes.md` says what was measured |
-| `stable` | every divergence has a `detect` block and a matching choice point in `maths.under_determined`; four known answers; original authors and work cited; runs on `empty` and `single-node`; two engines besides the reference |
+| `stable` | every divergence has a `detect` block and a matching choice point in `maths.under_determined`; four known answers; original authors and work cited; runs on `empty` and `single-node`; two backends besides the reference |
 
 Start at `emerging` -- or `frontier` if the work is exploratory, which keeps it
 out of everything until someone opts in with `--allow-frontier`.
@@ -208,7 +263,7 @@ out of everything until someone opts in with `--allow-frontier`.
 ```bash
 gigi review <algorithm>              # what this tier requires, and the next
 gigi promote <algorithm> --dry-run   # would it pass?
-gigi promote <algorithm>             # check, then edit algorithm.yaml
+gigi promote <algorithm>             # check, then edit method.yaml
 ```
 
 `gigi promote` refuses a tier the entry has not earned, and only ever moves up.
@@ -240,25 +295,43 @@ datasets/<id>/
 
 Write the `description` as the reason it exists. "Directed graph with two sink nodes, because rank held by a node with no outgoing edges has to go somewhere" is useful; "test graph 3" is not.
 
-## Adding an engine
+## Adding a backend
 
-Rarer, and it touches `gigi/`. One file in `gigi/adapters/` with `available()`, `version()` and `convert()`, plus a line in `gigi/adapters/__init__.py`. Conversion happens once per engine; per-algorithm calls stay beside the
+Rarer, and it touches `gigi/`. One file in `gigi/backends/` with `available()`, `version()` and `convert()`, plus a line in `gigi/backends/__init__.py`. Conversion happens once per backend; per-algorithm calls stay beside the
 algorithm.
 
 ## What we will push back on
 
 - **A divergence without a `detect` block, on a `stable` algorithm.** An untestable claim rots. CI enforces this.
 - **A new abstraction with one implementation.** Ask which existing thing it replaces. If the answer is "nothing yet", it is too early.
-- **Engine logic in `implementations/<engine>.py`.** If there is a loop over nodes, it belongs in `reference.py`.
+- **Backend logic in `implementations/<backend>.py`.** If there is a loop over nodes, it belongs in `reference.py`.
 - **A Pydantic model that never crosses a module boundary and is never serialised.** Return a plain value.
 - **A fixture in Parquet that could have been CSV.** We need to see the diff.
 - **A `maths:` block with no checkable invariant, on a `stable` algorithm.** If nothing about the output can be asserted, say why in a note.
 - **`equivalent_under` with no condition**, or a `family:` that is not in `families/families.yaml`.
 - **`inventor: <one name>`, or a Gigi contributor listed as an original author.** The layers stay separate; CI fails if a name appears in both.
 
+### If your method does not take a graph
+
+Most of the guide above assumes a graph, because most of the registry is
+graphs. Nothing in the process changes if yours is not — but two extra things
+have to exist before your entry can, and both are cheap:
+
+- **A dataset kind that can hold your input.** `graph` and `vectors` exist. A
+  new one needs a metadata model, a loader that validates the file against that
+  metadata, a profile, and a `Converted*` that says how results are keyed. See
+  `gigi/vectors.py`, which is the whole pattern in under a hundred lines.
+- **An output kind with a comparator.** `node_score` and `similarity_score`
+  exist. A new one fails the build until `results.py` can judge two of them —
+  the same rule as an invariant that names no check.
+
+If your method needs neither, you are adding content and not schema, which is
+the easy case. If it needs both, say so in the pull request: it is a bigger
+change than a method, and worth reviewing as one.
+
 `gigi/` has a size budget, and `tests/test_readability.py` enforces it along with the rest of the readability rules: no module over 400 code lines, a docstring on every module and every non-obvious public name, no function over 120 lines, help text on every CLI command.
 
-The budget covers **capability**, code that computes something nothing else can (models, registry, graph, adapters, harness, results, invariants, people). That is 1,500 lines, currently 1,360. **Reporting**, the CLI, the site, the review summary, is counted separately, because it grows with what we choose to show rather than with what the system understands. The line is not a loophole: if something in `cli/` or `site/` starts computing rather than formatting, it has moved buckets.
+The budget covers **capability**, code that computes something nothing else can (models, registry, the data layer, adapters, harness, results, invariants, people). That is 2,400 lines, currently 2,347. **Reporting**, the CLI, the site, the review summary, is counted separately, because it grows with what we choose to show rather than with what the system understands. The line is not a loophole: if something in `cli/` or `site/` starts computing rather than formatting, it has moved buckets.
 
 New here? [docs/CODEBASE.md](docs/CODEBASE.md) has a reading order that gets you through the whole thing in about ninety minutes. It is a budget, not a law, but a pull request that grows it noticeably should say what it bought.
 

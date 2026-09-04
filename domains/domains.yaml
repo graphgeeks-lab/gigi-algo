@@ -1,0 +1,30 @@
+# The widest grouping. A domain is a body of problems that share a way of
+# thinking, not a folder: methods live flat in `methods/` and are grouped for
+# display by the domain their family belongs to.
+#
+# A domain earns its place by having at least one family in it.
+# `entity_resolution` and `geospatial` are on the roadmap (docs/ONTOLOGY.md)
+# and are deliberately absent until a family and a method arrive with them --
+# an empty domain is a plan, not a fact, and the test suite says so.
+
+- id: graph
+  name: Graph
+  description: >
+    Methods over nodes and the relationships between them. The domain is
+    distinguished less by the data than by the questions: reachability,
+    importance, grouping and routes are all questions about structure rather
+    than about the values sitting on it.
+  related: []
+
+- id: similarity
+  name: Similarity
+  description: >
+    Methods that score how alike two things are, given a numeric description of
+    each. The domain that proves the schema is not graph-shaped: the input is a
+    set of vectors rather than nodes and edges, the output is keyed by pair
+    rather than by node, and neither required a special case.
+
+    Distinguished from the `similarity` family inside the graph domain, which
+    asks the same question about nodes and uses graph structure to answer it.
+    Same question, different data, and therefore a different domain.
+  related: [graph]

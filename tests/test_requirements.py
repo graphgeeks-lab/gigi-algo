@@ -12,24 +12,24 @@ import pytest
 from gigi import registry, requirements
 from gigi.models import Maturity
 
-ALGORITHMS = registry.list_algorithms()
+ALGORITHMS = registry.list_methods()
 
 
-@pytest.mark.parametrize("algorithm_id", ALGORITHMS)
-def test_algorithm_meets_the_requirements_of_its_maturity(algorithm_id):
-    spec = registry.load_algorithm(algorithm_id)
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_algorithm_meets_the_requirements_of_its_maturity(method_id):
+    spec = registry.load_method(method_id)
     lacking = requirements.unmet(spec)
     assert not lacking, (
-        f"{algorithm_id} claims `{spec.maturity.value}` but lacks:\n  "
+        f"{method_id} claims `{spec.maturity.value}` but lacks:\n  "
         + "\n  ".join(f"{o.requirement.id}: {o.detail}" for o in lacking)
     )
 
 
-@pytest.mark.parametrize("algorithm_id", ALGORITHMS)
-def test_every_requirement_is_reported_not_just_the_failures(algorithm_id):
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_every_requirement_is_reported_not_just_the_failures(method_id):
     """`gigi review` shows the whole ladder, so every requirement must produce
     an outcome -- met or not, required or recommended."""
-    outcomes = requirements.check(registry.load_algorithm(algorithm_id))
+    outcomes = requirements.check(registry.load_method(method_id))
     assert {o.requirement.id for o in outcomes} == {r.id for r in requirements.REQUIREMENTS}
 
 
@@ -51,10 +51,10 @@ def test_stable_requires_strictly_more_than_emerging():
 
 def test_next_tier_names_what_promotion_takes():
     """For an emerging algorithm, the path to stable is a concrete list."""
-    emerging = [a for a in ALGORITHMS if registry.load_algorithm(a).maturity == Maturity.emerging]
+    emerging = [a for a in ALGORITHMS if registry.load_method(a).maturity == Maturity.emerging]
     if not emerging:
         pytest.skip("no emerging algorithm to test promotion against")
-    target, lacking = requirements.next_tier(registry.load_algorithm(emerging[0]))
+    target, lacking = requirements.next_tier(registry.load_method(emerging[0]))
     assert target == Maturity.stable
     for outcome in lacking:
         assert not outcome.met
@@ -62,10 +62,10 @@ def test_next_tier_names_what_promotion_takes():
 
 
 def test_stable_has_no_next_tier():
-    stable = [a for a in ALGORITHMS if registry.load_algorithm(a).maturity == Maturity.stable]
+    stable = [a for a in ALGORITHMS if registry.load_method(a).maturity == Maturity.stable]
     if not stable:
         pytest.skip("no stable algorithm")
-    target, lacking = requirements.next_tier(registry.load_algorithm(stable[0]))
+    target, lacking = requirements.next_tier(registry.load_method(stable[0]))
     assert target is None and lacking == []
 
 

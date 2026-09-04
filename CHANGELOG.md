@@ -11,7 +11,119 @@ versions follow [PEP 440](https://peps.python.org/pep-0440/).
 ## [Unreleased]
 
 ### Added
-- `gigi version`, showing the build, the engine versions and **which registry**
+- **The first method that is not about graphs** (PR 2b). `cosine_similarity`,
+  across a reference implementation, SciPy and scikit-learn. It exists to
+  falsify the claim ADR 0010 made and could not test: that the schema had
+  stopped being graph-shaped.
+  - `datasets/<id>/dataset.yaml` now declares `kind:` — `graph` or `vectors` —
+    discriminated the same way a method's `inputs` are. `gigi/data.py` is the
+    one door: ask for a fixture by id, get whichever container fits.
+  - `gigi/vectors.py`: a `VectorData` container, a CSV loader that validates
+    against the metadata, and a profile. Ids containing `|` are refused,
+    because results are keyed `a|b`.
+  - Two vector backends, `scipy` and `sklearn`. A backend is not "a graph
+    library"; it is whatever can be handed a dataset and asked for an answer.
+    Each declares what it accepts, and refuses the rest by name.
+  - `similarity_score` — an output kind keyed by canonical pair rather than by
+    node — with the comparator the extension rule demands.
+  - Two new invariants: `scores_in_signed_unit_interval` (Cauchy-Schwarz,
+    executed) and `keys_are_canonical_pairs`.
+  - Fixtures `vectors-small`, `vectors-with-zero`, `vectors-single`; the
+    `similarity` domain, the `vector-similarity` family, and the
+    `pairwise_vector_similarity` problem.
+  - **Two divergences on the first fixture.** A zero vector has no direction, so
+    the cosine of any pair involving one is undefined. SciPy returns `NaN`,
+    scikit-learn returns `0.0`, and the reference declines the pair. The
+    scikit-learn convention is the quieter and the worse: a failed embedding is
+    reported as *known to be dissimilar* rather than *no answer*.
+- **The semantic layer** (PR 2 of the generalisation). The registry now knows
+  not just what a method computes but what it *assumes about your data*.
+  - `problems/` — questions stated without reference to any method. A method
+    names the problems it solves and, more usefully, the ones it is commonly
+    mistaken for.
+  - `semantic_role` and `interpretation` on parameters. PageRank reads an edge
+    weight as *strength* (higher is a stronger relationship); Dijkstra will read
+    the same column as *cost* (higher is worse).
+  - `semantic_interpretations` on a method: how it reads each part of its
+    input, and which real-world meanings fit, are contextual, or are backwards.
+  - `semantics/column_meanings.yaml` — a hint vocabulary, kept as data, that
+    guesses what a column holds from its name.
+  - Structured `use_cases`, with the `input_mapping` that is the part that goes
+    wrong.
+  - `ai_context` in Apache OSSIE's shape, so anything already reading an OSSIE
+    `ai_context` reads ours.
+- **`gigi why <method> [--graph …]`** — what a method answers, what it does
+  not, how it reads its input, and with `--graph`, what it will make of the
+  columns actually in front of you. Without the flag it is documentation; with
+  it, it is advice.
+- **`gigi alternatives`**, **`gigi related`**, **`gigi problems`**,
+  **`gigi problem <id>`**.
+- `datasets/road-distances-small`, whose weight column is called `distance` and
+  means one.
+
+### Fixed
+- The wheel shipped without `problems/` and `semantics/`, so an installed
+  package could not resolve a problem id or read the column-meaning vocabulary
+  — everything PR 2 added was missing outside a checkout. The content
+  directories are now listed once, in `gigi/paths.py`, and the packaging test
+  checks `pyproject.toml` against that list rather than against a copy of it.
+- `test_compiles_to_pdf` compiled one entry, so a `latex:` field that mitex
+  cannot render under Typst 0.15 (`\langle`) reached a PDF build rather than
+  CI. Every entry is now typeset in the suite.
+- The backends were passed the *dataset's* weight column name, which only
+  worked while every fixture happened to call its column `weight`. On
+  `road-distances-small` igraph looked for an edge attribute named `distance`
+  that the adapter had never created. Adapters now declare the attribute name
+  they used (`ConvertedGraph.weight_attribute`) and implementations ask for it.
+
+### Changed
+- `gigi run` and `gigi compare` take `--dataset/-d`; `--graph/-g` still works.
+  `gigi datasets` gained a `kind` column and reports shape per kind.
+- `gigi review` no longer suggests writing a NetworkX implementation of a
+  vector measure, or running a graph algorithm against a vectors fixture. Gaps
+  are computed from what the method can actually consume.
+- The capability budget is 2,400, raised from 2,100 for the data layer. PLAN.md
+  says what it bought.
+- `models.py` passed 400 code lines and so became a package
+  (`people`/`spec`/`data`/`execution`), which is the rule it was always going
+  to hit. `from gigi.models import X` is unchanged.
+- The CLI gained `explain.py`, splitting "what does the registry hold" from
+  "what does this mean for me".
+- `problem:` on a method is now `summary:`; the *question* lives in the problem
+  it names. `intent.solves` is gone — the free-text phrasings moved to
+  `ai_context.synonyms`, and `intent.not_for` now names problems rather than
+  prose.
+- `Relationship.algorithm` is `Relationship.method`.
+- **The schema is no longer graph-shaped** (PR 1 of the generalisation,
+  [ADR 0010](docs/adr/0010-general-schema-narrow-content.md)). Content stays
+  graph-only; the shape underneath does not assume it.
+  - `AlgorithmSpec` is now `MethodSpec`, with a required `kind`
+    (`algorithm` | `measure` | `statistical_model` | `heuristic` | `procedure`
+    | `solver`).
+  - `requirements:` is now `inputs:`, a union discriminated on `kind`, so a
+    method can consume something other than a graph.
+  - `engines:` is now `backends:`, and `EngineAdapter` is `BackendAdapter`.
+    NetworkX is a graph engine; scikit-learn and Splink are not.
+  - `algorithms/` is now `methods/`, flat, with `algorithm.yaml` renamed to
+    `method.yaml`. Grouping is by domain, for display only.
+  - Families belong to a domain (`domains/domains.yaml`), and a method's domain
+    is *derived* through its family rather than stored on the method.
+  - `comparison.kind` is gone: which comparator runs follows from
+    `output.kind`, and two fields naming one fact drift apart.
+  - `OutputKind` is pruned to the kinds that have a comparator. A kind without
+    one describes a method nothing can verify, and the test suite now refuses
+    it — the same rule as an invariant that names no check.
+  - Unknown keys in an input spec are rejected rather than silently ignored.
+  - `gigi list` gained `--domain` and `--kind`; `gigi.method()` joins
+    `gigi.algorithm()`.
+
+  No behaviour changed. A before/after fingerprint of every run, comparison,
+  invariant and divergence check across both methods, all backends and all nine
+  fixtures is identical except for the word "engines" becoming "backends" in
+  one sentence of the verification conclusion.
+
+### Added
+- `gigi version`, showing the build, the backend versions and **which registry**
   is being read -- a checkout or the copy packaged in the wheel.
 - `gigi promote`, which re-checks every requirement of the target tier and
   refuses one that has not been earned. It only moves up the ladder.
@@ -37,11 +149,11 @@ versions follow [PEP 440](https://peps.python.org/pep-0440/).
 ## [0.1.0] - 2026-09-03
 
 The first version that proves the thesis: the same named algorithm gives
-different answers on different engines, and a registry can show that with
+different answers on different backends, and a registry can show that with
 reproducible evidence.
 
 ### Added
-- **Registry.** `algorithms/<id>/algorithm.yaml` as the only registration step:
+- **Registry.** `algorithms/<id>/method.yaml` as the only registration step:
   provenance and Gigi credits kept as separate attribution layers, a
   machine-readable `maths:` block with executed invariants and named choice
   points, typed and mirrored `relationships`, and a `family` that resolves
@@ -53,7 +165,7 @@ reproducible evidence.
   rustworkx's degree centrality disagreeing with in+out degree on three
   fixtures; and a 0 / 1 / NaN three-way split on the single-node graph.
 - **Verification harness.** `gigi verify` asks two questions and never mixes
-  them: do engines agree where the registry says they agree, and does every
+  them: do backends agree where the registry says they agree, and does every
   declared divergence still reproduce.
 - **Known answers.** `tests/expected.yaml` per algorithm -- expected values
   derived from the definition, never from running the code -- as the reference

@@ -11,7 +11,7 @@ name: release
 #
 #   check     the tag, pyproject.toml, CITATION.cff and CHANGELOG.md all name the
 #             same version; the version is not already on PyPI; the suite passes
-#             on both engine matrices; the registry verifies
+#             on both backend matrices; the registry verifies
 #   build     sdist + wheel, once, uploaded as an artifact the later jobs reuse
 #   publish   to PyPI by trusted publishing (OIDC) -- no token lives anywhere
 #   release   a GitHub Release whose notes are the CHANGELOG section, created
@@ -111,7 +111,7 @@ jobs:
           print(f"{v} is not on PyPI yet.")
           PY
 
-      - name: Install and test (every engine)
+      - name: Install and test (every backend)
         run: |
           uv sync --extra dev
           uv run pytest -q

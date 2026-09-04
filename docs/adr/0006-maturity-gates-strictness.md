@@ -10,7 +10,7 @@ introduce now, and retrofitting it later would touch every spec.
 
 ## Decision
 
-Every `AlgorithmSpec` carries `maturity`: `stable`, `emerging`, `frontier` or
+Every `MethodSpec` carries `maturity`: `stable`, `emerging`, `frontier` or
 `historical`. In v0.1 it does one job: `stable` algorithms must make their
 divergence claims testable, `emerging` ones need not.
 

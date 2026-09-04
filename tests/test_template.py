@@ -13,7 +13,7 @@ import shutil
 
 import pytest
 
-from gigi.paths import algorithms_dir
+from gigi.paths import methods_dir
 
 TEMPLATE_ID = "template_check"
 
@@ -21,12 +21,12 @@ TEMPLATE_ID = "template_check"
 @pytest.fixture()
 def template_registry(tmp_path, monkeypatch):
     """A registry containing only the template, copied under a usable id."""
-    source = algorithms_dir() / "_template"
+    source = methods_dir() / "_template"
     registry_root = tmp_path / "algorithms"
     destination = registry_root / TEMPLATE_ID
     shutil.copytree(source, destination)
 
-    spec_path = destination / "algorithm.yaml"
+    spec_path = destination / "method.yaml"
     spec_path.write_text(
         spec_path.read_text(encoding="utf-8").replace(
             "id: my_algorithm", f"id: {TEMPLATE_ID}", 1
@@ -34,14 +34,14 @@ def template_registry(tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("GIGI_ALGORITHMS_DIR", str(registry_root))
+    monkeypatch.setenv("GIGI_METHODS_DIR", str(registry_root))
     yield registry_root
 
 
 def test_template_spec_validates(template_registry):
     from gigi import registry
 
-    spec = registry.load_algorithm(TEMPLATE_ID)
+    spec = registry.load_method(TEMPLATE_ID)
     assert spec.id == TEMPLATE_ID
     assert spec.provenance.original_authors, "the template should demonstrate provenance"
     assert spec.credits.spec_curators, "the template should demonstrate gigi credits"
@@ -57,15 +57,15 @@ def test_template_reference_runs(template_registry):
 
 
 def test_template_engines_agree(template_registry):
-    """The whole contributor loop, on the template: run every installed engine
+    """The whole contributor loop, on the template: run every installed backend
     and compare it against the reference."""
-    from gigi.adapters import ENGINES
+    from gigi.backends import BACKENDS
     from gigi.harness import compare
 
-    if not ENGINES["networkx"].available():
+    if not BACKENDS["networkx"].available():
         pytest.skip("networkx is not installed")
 
-    runs, comparisons = compare(TEMPLATE_ID, "tiny-directed", engines=["reference", "networkx"])
+    runs, comparisons = compare(TEMPLATE_ID, "tiny-directed", backends=["reference", "networkx"])
     assert all(r.status.value == "ok" for r in runs), [r.error for r in runs]
     assert comparisons[0].equivalent, comparisons[0].metrics
 

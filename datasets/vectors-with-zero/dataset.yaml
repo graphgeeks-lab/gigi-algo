@@ -1,0 +1,15 @@
+kind: vectors
+id: vectors-with-zero
+description: >
+  Three vectors, one of which is all zeros. The zero vector has no direction,
+  so the cosine of any pair involving it is 0/0 -- undefined by the definition,
+  and answered differently by every library that meets it. This fixture exists
+  to make that disagreement reproducible.
+id_column: id
+features:
+  zero_vectors: true
+  negative_values: false
+expected:
+  vectors: 3
+  dimensions: 2
+license: CC0

@@ -13,7 +13,7 @@ import yaml
 from gigi import people, registry
 from gigi.paths import repo_root
 
-ALGORITHMS = registry.list_algorithms()
+ALGORITHMS = registry.list_methods()
 
 
 def test_people_registry_loads():
@@ -37,40 +37,40 @@ def test_every_person_is_referenced():
     assert not orphans, f"people with no contributions recorded: {orphans}"
 
 
-@pytest.mark.parametrize("algorithm_id", ALGORITHMS)
-def test_stable_algorithms_have_provenance(algorithm_id):
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_stable_algorithms_have_provenance(method_id):
     """A stable entry that cannot say where the algorithm came from is not
     finished."""
-    spec = registry.load_algorithm(algorithm_id)
+    spec = registry.load_method(method_id)
     if spec.maturity.value != "stable":
         return
-    assert spec.provenance.original_authors, f"{algorithm_id}: no original authors"
-    assert spec.provenance.original_work, f"{algorithm_id}: no original work cited"
+    assert spec.provenance.original_authors, f"{method_id}: no original authors"
+    assert spec.provenance.original_work, f"{method_id}: no original work cited"
 
 
-@pytest.mark.parametrize("algorithm_id", ALGORITHMS)
-def test_provenance_is_separate_from_credits(algorithm_id):
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_provenance_is_separate_from_credits(method_id):
     """The two attribution layers must not be conflated: an original author is
     a historical fact, a Gigi contributor is a person in people.yaml."""
-    spec = registry.load_algorithm(algorithm_id)
+    spec = registry.load_method(method_id)
     historical = {author.name.lower() for author in spec.provenance.original_authors}
     contributors = {people.get_person(i).name.lower() for i in spec.credits.everyone()}
     assert not (historical & contributors), (
-        f"{algorithm_id}: the same name appears as both an original author and "
+        f"{method_id}: the same name appears as both an original author and "
         f"a Gigi contributor -- if that is genuinely true, say so in "
         f"attribution_notes rather than letting the layers blur"
     )
 
 
-@pytest.mark.parametrize("algorithm_id", ALGORITHMS)
-def test_precursor_algorithm_ids_are_plausible(algorithm_id):
+@pytest.mark.parametrize("method_id", ALGORITHMS)
+def test_precursor_algorithm_ids_are_plausible(method_id):
     """A precursor may point at an algorithm we have not added yet, but if we
     have added it, the id must be right."""
-    spec = registry.load_algorithm(algorithm_id)
+    spec = registry.load_method(method_id)
     known = set(ALGORITHMS)
     for precursor in spec.provenance.precursors:
-        if precursor.algorithm_id and precursor.algorithm_id in known:
-            registry.load_algorithm(precursor.algorithm_id)
+        if precursor.method_id and precursor.method_id in known:
+            registry.load_method(precursor.method_id)
 
 
 def test_profile_reports_lineage_not_a_score():

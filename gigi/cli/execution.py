@@ -11,45 +11,46 @@ import typer
 from rich.table import Table
 
 from gigi import registry, runstore
-from gigi.adapters import available_engines, engine_versions
+from gigi.backends import available_backends, backend_versions
 from gigi.cli.app import app, console, parse_overrides
-from gigi.graph import list_datasets, load_graph, profile_graph
+from gigi.data import list_datasets
+from gigi.data import describe, load_dataset, profile_dataset
 from gigi.harness import compare as compare_engines
 from gigi.harness import run as run_algorithm
-from gigi.harness import runnable_engines
+from gigi.harness import runnable_backends
 from gigi.harness import verify as verify_algorithm
 from gigi.models import RunStatus
 
 @app.command()
-def engines() -> None:
-    """Show which engines are installed here."""
-    table = Table("engine", "installed", "version")
-    for name, version in engine_versions().items():
+def backends() -> None:
+    """Show which backends are installed here."""
+    table = Table("backend", "installed", "version")
+    for name, version in backend_versions().items():
         table.add_row(name, "yes", version or "unknown")
     for name in ("reference", "networkx", "igraph", "rustworkx"):
-        if name not in engine_versions():
+        if name not in backend_versions():
             table.add_row(name, "no", "-")
     console.print(table)
 
 
 @app.command()
 def datasets() -> None:
-    """List the graph fixtures."""
-    table = Table("id", "nodes", "edges", "features")
+    """List the fixtures, of every kind."""
+    table = Table("id", "kind", "shape", "features")
     for dataset_id in list_datasets():
-        graph = load_graph(dataset_id)
-        profile = profile_graph(graph)
-        features = [name for name, on in graph.metadata.features.items() if on]
+        data = load_dataset(dataset_id)
+        profile = profile_dataset(data)
+        features = [name for name, on in data.metadata.features.items() if on]
         table.add_row(
-            dataset_id, str(profile.node_count), str(profile.edge_count), ", ".join(features)
+            dataset_id, profile.kind, describe(profile), ", ".join(features)
         )
     console.print(table)
 
 
 @app.command()
-def inspect(graph: str) -> None:
-    """Profile a graph. Cheap facts only: nothing here is a graph algorithm."""
-    profile = profile_graph(load_graph(graph))
+def inspect(dataset: str) -> None:
+    """Profile a fixture. Cheap facts only: nothing here is an analysis."""
+    profile = profile_dataset(load_dataset(dataset))
     table = Table("property", "value")
     for name, value in profile.model_dump().items():
         table.add_row(name, str(value))
@@ -59,24 +60,27 @@ def inspect(graph: str) -> None:
 @app.command()
 def run(
     algorithm: str,
-    graph: str = typer.Option(..., "--graph", "-g", help="Dataset id or directory."),
-    engine: str = typer.Option("reference", "--engine", "-e"),
+    dataset: str = typer.Option(
+        ..., "--dataset", "-d", "--graph", "-g",
+        help="Dataset id or directory, of any kind.",
+    ),
+    backend: str = typer.Option("reference", "--backend", "-e"),
     set_: list[str] = typer.Option(None, "--set", "-s", help="Parameter override, name=value."),
     explicit: bool = typer.Option(
-        False, "--explicit", help="Pin ambiguous parameters instead of using engine defaults."
+        False, "--explicit", help="Pin ambiguous parameters instead of using backend defaults."
     ),
     allow_frontier: bool = typer.Option(
         False, "--allow-frontier", help="Run a `frontier` algorithm. See docs/MATURITY.md."
     ),
 ) -> None:
-    """Run one algorithm on one engine."""
+    """Run one algorithm on one backend."""
     from gigi.harness import resolve_parameters
 
-    spec = registry.load_algorithm(algorithm)
-    data = load_graph(graph)
+    spec = registry.load_method(algorithm)
+    data = load_dataset(dataset)
     params = resolve_parameters(spec, data, parse_overrides(set_), explicit=explicit)
 
-    result = run_algorithm(spec, engine, data, params, allow_frontier=allow_frontier)
+    result = run_algorithm(spec, backend, data, params, allow_frontier=allow_frontier)
     runstore.save_run(result)
 
     if result.status != RunStatus.ok:
@@ -84,7 +88,7 @@ def run(
         raise typer.Exit(1)
 
     console.print(
-        f"[bold]{spec.id}[/bold] on [bold]{engine} {result.engine_version}[/bold] "
+        f"[bold]{spec.id}[/bold] on [bold]{backend} {result.backend_version}[/bold] "
         f"over [bold]{data.id}[/bold]  ({result.total_duration_ms:.1f} ms)"
     )
 
@@ -97,48 +101,51 @@ def run(
         params_table.add_row(str(left[0]), str(left[1]), str(right[0]), str(right[1]))
     console.print(params_table)
 
-    scores = Table("node", spec.output.score_name or "score")
+    # "node" for a node score, "pair" for a similarity score: the key means
+    # different things and the header should say which.
+    key_label = "pair" if result.result.kind.value == "similarity_score" else "node"
+    scores = Table(key_label, spec.output.score_name or "score")
     ranked = sorted(result.result.scores.items(), key=lambda kv: -kv[1])
-    for node, score in ranked:
-        scores.add_row(node, f"{score:.8f}")
+    for key, score in ranked:
+        scores.add_row(key, f"{score:.8f}")
     console.print(scores)
 
 
 @app.command()
 def compare(
     algorithm: str,
-    graph: str = typer.Option(..., "--graph", "-g"),
-    engines_option: str = typer.Option(None, "--engines", help="Comma-separated engine list."),
+    dataset: str = typer.Option(..., "--dataset", "-d", "--graph", "-g"),
+    backends_option: str = typer.Option(None, "--backends", help="Comma-separated backend list."),
     set_: list[str] = typer.Option(None, "--set", "-s"),
     defaults: bool = typer.Option(
-        False, "--defaults", help="Use each engine's own defaults instead of pinning parameters."
+        False, "--defaults", help="Use each backend's own defaults instead of pinning parameters."
     ),
     allow_frontier: bool = typer.Option(False, "--allow-frontier"),
 ) -> None:
-    """Run every engine on one graph and compare them against the reference."""
-    spec = registry.load_algorithm(algorithm)
-    selected = engines_option.split(",") if engines_option else None
+    """Run every backend on one fixture and compare them against the reference."""
+    spec = registry.load_method(algorithm)
+    selected = backends_option.split(",") if backends_option else None
     runs, comparisons = compare_engines(
         spec,
-        graph,
-        engines=selected,
+        dataset,
+        backends=selected,
         parameters=parse_overrides(set_),
         explicit=not defaults,
         allow_frontier=allow_frontier,
     )
 
-    table = Table("engine", "version", "status", "ms", "top node", "max abs error", "agrees")
-    metrics = {c.engine_b: c for c in comparisons}
+    table = Table("backend", "version", "status", "ms", "top key", "max abs error", "agrees")
+    metrics = {c.backend_b: c for c in comparisons}
     for result in runs:
-        comparison = metrics.get(result.engine)
+        comparison = metrics.get(result.backend)
         top = (
             max(result.result.scores, key=lambda n: result.result.scores[n])
             if result.result
             else "-"
         )
         table.add_row(
-            result.engine,
-            result.engine_version or "-",
+            result.backend,
+            result.backend_version or "-",
             result.status.value,
             f"{result.total_duration_ms:.1f}",
             top,
@@ -159,17 +166,17 @@ def verify(
     """Check the registry's claims against reality."""
     from gigi.maturity import FrontierBlocked
 
-    targets = [algorithm] if algorithm else registry.list_algorithms()
+    targets = [algorithm] if algorithm else registry.list_methods()
     failed = False
 
-    for algorithm_id in targets:
-        spec = registry.load_algorithm(algorithm_id)
+    for method_id in targets:
+        spec = registry.load_method(method_id)
         try:
             report = verify_algorithm(spec, allow_frontier=allow_frontier)
         except FrontierBlocked as blocked:
             # Verifying everything should not stop at a frontier entry, but it
             # must not silently pretend to have checked one either.
-            console.print(f"[yellow]SKIP[/yellow] {algorithm_id} -- {blocked}")
+            console.print(f"[yellow]SKIP[/yellow] {method_id} -- {blocked}")
             if algorithm:
                 raise typer.Exit(1)
             continue
@@ -178,17 +185,17 @@ def verify(
 
         colour = "green" if report.status == "pass" else "red"
         console.print(
-            f"[{colour}]{report.status.upper()}[/{colour}] {algorithm_id} "
+            f"[{colour}]{report.status.upper()}[/{colour}] {method_id} "
             f"-- {report.conclusion}"
         )
 
         if report.divergence_checks:
-            table = Table("divergence", "dataset", "engines", "expected", "observed", "ok")
+            table = Table("divergence", "dataset", "backends", "expected", "observed", "ok")
             for check in report.divergence_checks:
                 table.add_row(
                     check.divergence_id,
                     ", ".join(check.datasets),
-                    " vs ".join(check.engines),
+                    " vs ".join(check.backends),
                     check.expected,
                     check.observed,
                     "yes" if check.reproduced else ("skip" if check.observed == "skipped" else "[red]NO[/red]"),
@@ -197,14 +204,14 @@ def verify(
 
         for difference in report.undeclared_differences:
             console.print(
-                f"  [red]undeclared[/red] {difference.engine_a} vs {difference.engine_b} "
+                f"  [red]undeclared[/red] {difference.backend_a} vs {difference.backend_b} "
                 f"on {difference.dataset_id}: max abs error "
                 f"{difference.metrics.get('max_abs_error', float('nan')):.3e}"
             )
         for difference in report.explained_differences:
             console.print(
                 f"  [yellow]explained[/yellow] by {difference.divergence_id}: "
-                f"{difference.engine_a} vs {difference.engine_b} on {difference.dataset_id}"
+                f"{difference.backend_a} vs {difference.backend_b} on {difference.dataset_id}"
             )
 
         failed = failed or report.status == "fail"
@@ -255,8 +262,8 @@ def typst(
         console.print("[red]PDF needs the typst package:[/red] pip install 'gigi-algo[docs]'")
         raise typer.Exit(1)
 
-    for algorithm_id in [algorithm] if algorithm else registry.list_algorithms():
-        for path in write(algorithm_id, output, pdf=pdf, verify_first=verify_first, review=review):
+    for method_id in [algorithm] if algorithm else registry.list_methods():
+        for path in write(method_id, output, pdf=pdf, verify_first=verify_first, review=review):
             console.print(f"wrote {path}")
 
 
@@ -265,9 +272,9 @@ def status() -> None:
     """What is installed and what is verifiable in this environment."""
     from gigi.maturity import FRONTIER_ENV, frontier_allowed, gated
 
-    console.print(f"engines available: {', '.join(available_engines())}")
-    for algorithm_id in registry.list_algorithms():
-        spec = registry.load_algorithm(algorithm_id)
+    console.print(f"backends available: {', '.join(available_backends())}")
+    for method_id in registry.list_methods():
+        spec = registry.load_method(method_id)
         note = ""
         if gated(spec):
             note = (
@@ -276,5 +283,5 @@ def status() -> None:
                 else f"  [yellow](frontier: allowed by {FRONTIER_ENV})[/yellow]"
             )
         console.print(
-            f"  {algorithm_id}: runnable on {', '.join(runnable_engines(spec))}{note}"
+            f"  {method_id}: runnable on {', '.join(runnable_backends(spec))}{note}"
         )
