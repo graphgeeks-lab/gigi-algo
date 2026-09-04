@@ -1,0 +1,19 @@
+kind: graph
+id: two-clusters-directed
+description: >
+  Two mutually reachable pairs joined by a single one-way edge. Weakly it is one
+  component; strongly it is two, with a crossing edge between them that forms no
+  cycle. The smallest fixture whose strong condensation is a non-trivial DAG,
+  and therefore the one that tests `components_are_maximal` under `mode: strong`
+  properly rather than vacuously.
+directed: true
+edges: {source: source, target: target}
+features:
+  weighted: false
+  self_loops: false
+  duplicate_edges: false
+  dangling_nodes: false
+expected:
+  nodes: 4
+  edges: 5
+license: CC0

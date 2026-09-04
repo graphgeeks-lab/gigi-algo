@@ -166,14 +166,24 @@ which is the failure mode the whole project exists to avoid. So: **an output
 kind without a comparator fails the build**, exactly like an invariant without
 a check.
 
-It has now been paid twice. `similarity_score` arrived with `cosine_similarity`
-and reuses `compare_scores`, which is allowed and was argued rather than
-assumed: both kinds are one number per key, judged by numeric tolerance over a
-matching key set, and only the meaning of the key differs. `probability`,
-`partition` and `path` will each need a real comparator of their own. The
-**input kind** rule was paid at the same time: `vectors` shipped with
-`gigi/vectors.py` (loader and validation) and `profile_vectors`, and the
-fixtures declare `kind:` rather than being sniffed.
+It has now been paid three times, and the third is the one that shows the rule
+works. `similarity_score` arrived with `cosine_similarity` and reuses
+`compare_scores` — allowed, and argued rather than assumed: both kinds are one
+number per key over a matching key set, and only the meaning of the key differs.
+That made the rule cheap to satisfy twice, and therefore untested.
+
+`partition` could not reuse anything. Its result is a grouping whose component
+*names* are meaningless, and the four backends name them four different ways, so
+value comparison would report four correct implementations as four different
+answers. It shipped with `PartitionResult`, `compare_partitions`, and a
+canonicalising normaliser. `probability` and `path` will each need the same.
+
+The **input kind** rule was paid by `vectors`, which shipped with
+`gigi/vectors.py` (loader and validation) and `profile_vectors`; fixtures
+declare `kind:` rather than being sniffed. And a third extension point appeared
+that this table did not anticipate: an invariant that needs to see its *input*,
+or the parameters it ran under. `CheckContext` is that, and the price is the
+same shape — a check that names no context it can use is just a check.
 
 ### Adding a domain, worked
 
@@ -337,6 +347,7 @@ with no domain-specific hacks leaking sideways:
 | entry | kind | domain | proves |
 |---|---|---|---|
 | PageRank | algorithm | graph | *(built)* |
+| Connected components | algorithm | graph | *(built)* an output kind that is not one number per key, and invariants strong enough to characterise the answer |
 | Cosine similarity | measure | similarity | *(built)* non-graph input, a result keyed by pair, and a checkable bound that is a theorem rather than a convention |
 | Fellegi-Sunter | statistical_model | entity_resolution | rich `under_determined`, composition, and an output that is hard to verify |
 | CSR | *(structure)* | graph | the second root, and honest complexity |

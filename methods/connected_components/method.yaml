@@ -171,7 +171,7 @@ maths:
         - weak -- ignore the arrows
         - strong -- must reach both ways
         - refuse to answer until the caller says which
-      datasets: [tiny-directed, dangling-small]
+      datasets: [tiny-directed, dangling-small, two-clusters-directed]
       note: >
         The central ambiguity, and the libraries do not agree on how to handle
         it. NetworkX and rustworkx refuse: `connected_components` raises on a
@@ -298,6 +298,7 @@ datasets:
   - self-loop-small
   - duplicate-edge-small
   - road-distances-small
+  - two-clusters-directed
 
 divergences: []
 

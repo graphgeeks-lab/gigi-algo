@@ -66,7 +66,7 @@ code is in the wrong place.
 
 ## Two buckets, and why the distinction matters
 
-**Capability** (~2,350 lines) is code that computes something nothing else can:
+**Capability** (~2,690 lines) is code that computes something nothing else can:
 models, registry, the data layer, adapters, harness, results, invariants,
 people.
 Growth here means the system learned a new concept — and that is what the

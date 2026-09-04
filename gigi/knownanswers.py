@@ -27,7 +27,7 @@ from gigi import registry
 from gigi.data import Dataset, load_dataset
 from gigi.graph import graph_from_edges
 from gigi.harness import resolve_parameters, run
-from gigi.models import KnownAnswer, RunStatus
+from gigi.models import KnownAnswer, PartitionResult, RunStatus
 from gigi.vectors import vectors_from_rows
 
 
@@ -58,6 +58,12 @@ def load_cases(method_id: str) -> list[KnownAnswer]:
             raise KnownAnswerError(f"{path}: {exc}") from exc
         if case.id in seen:
             raise KnownAnswerError(f"{path}: duplicate case id {case.id!r}")
+        if not case.model_fields_set & {"expected", "expected_components"}:
+            raise KnownAnswerError(
+                f"{path}: case {case.id!r} states no expectation, so it checks "
+                f"nothing. An empty one is fine -- `expected: {{}}` asserts that "
+                f"the result is empty -- but it has to be written down."
+            )
         if case.data() is None:
             raise KnownAnswerError(
                 f"{path}: case {case.id!r} names no data -- give it a dataset, a graph or vectors"
@@ -108,7 +114,23 @@ def run_case(method_id: str, case: KnownAnswer, backend: str = "reference") -> C
     if result.status != RunStatus.ok or result.result is None:
         return CaseResult(case.id, backend, False, f"{result.status.value}: {result.error}")
 
+    if isinstance(result.result, PartitionResult):
+        return _check_partition(case, backend, result.result)
+
     scores = result.result.scores
+    if not case.expected:
+        # An empty expectation is a real one: the empty fixture must produce an
+        # empty result. Without this branch the comparison below has nothing to
+        # iterate and passes whatever the backend returned.
+        return (
+            CaseResult(case.id, backend, True)
+            if not scores
+            else CaseResult(
+                case.id, backend, False,
+                f"expected no scores, got {len(scores)}: {sorted(scores)[:5]}",
+            )
+        )
+
     missing = sorted(set(case.expected) - set(scores))
     if missing:
         return CaseResult(case.id, backend, False, f"no score for {missing}")
@@ -128,3 +150,37 @@ def run_case(method_id: str, case: KnownAnswer, backend: str = "reference") -> C
             f"(off by {worst[1]:.3e}, tolerance {case.tolerance:g})",
         )
     return CaseResult(case.id, backend, True)
+
+
+def _check_partition(
+    case: KnownAnswer, backend: str, result: PartitionResult
+) -> CaseResult:
+    """Compare against the expected grouping, ignoring component names.
+
+    The same rule the comparator uses, for the same reason: a quotient set has
+    elements, not names, so a case that pinned labels would be asserting
+    something the definition does not say.
+    """
+    if case.expected_components is None:
+        return CaseResult(
+            case.id,
+            backend,
+            False,
+            "this method returns a partition, so the case needs "
+            "`expected_components` rather than `expected`",
+        )
+
+    expected = frozenset(frozenset(map(str, group)) for group in case.expected_components)
+    actual = result.groups()
+    if expected == actual:
+        return CaseResult(case.id, backend, True)
+
+    def show(groups):
+        return sorted(sorted(group) for group in groups)
+
+    return CaseResult(
+        case.id,
+        backend,
+        False,
+        f"expected {show(expected)}, got {show(actual)}",
+    )

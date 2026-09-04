@@ -11,6 +11,36 @@ versions follow [PEP 440](https://peps.python.org/pep-0440/).
 ## [Unreleased]
 
 ### Added
+- **`connected_components`**, and with it `partition` — the first output kind
+  that is not one number per key.
+  - Four backends, eleven fixtures, forty-four runs, and **zero divergences**.
+    That is the finding: the same fixtures that split three backends three ways
+    on `degree_centrality` produce identical answers here, because the
+    equivalence-relation definition settles the multigraph cases by reflexivity.
+    Measured agreement is evidence too.
+  - `PartitionResult` and `compare_partitions`. The four backends label
+    components four different ways — igraph in reverse topological order,
+    rustworkx in reverse index order — so comparing labels would report four
+    correct implementations as four different answers. The comparator compares
+    groupings; the normaliser canonicalises labels to `c0, c1, …` and the maths
+    says why they were never meaningful.
+  - `mode: weak | strong`, the ambiguity at the centre of this method. NetworkX
+    and rustworkx refuse a directed graph rather than choosing; igraph defaults
+    to weak. Gigi makes it a parameter and every adapter records which function
+    it actually called.
+  - `components_are_connected` and `components_are_maximal` — together a
+    *characterisation*, not a necessary condition: exactly one partition
+    satisfies both, so passing them means passing the definition.
+  - `CheckContext`, so an invariant can see the dataset and the effective
+    parameters. "Every component is connected" is a claim about a partition and
+    the graph it partitions; "maximal" means something different under `strong`
+    than under `weak`. See
+    [ADR 0012](docs/adr/0012-a-result-is-not-always-a-number.md).
+  - `expected_components` in known answers, for expectations that are groupings.
+  - `problems/component_membership.yaml`, and `problems/community_grouping.yaml`
+    — which nothing answers, and which `connected_components` names in
+    `not_for`, because "cluster the graph" almost never means components.
+  - `datasets/two-clusters-directed`, whose strong condensation is a real DAG.
 - **The first method that is not about graphs** (PR 2b). `cosine_similarity`,
   across a reference implementation, SciPy and scikit-learn. It exists to
   falsify the claim ADR 0010 made and could not test: that the schema had
@@ -62,6 +92,10 @@ versions follow [PEP 440](https://peps.python.org/pep-0440/).
   means one.
 
 ### Fixed
+- A known-answer case with `expected: {}` asserted nothing at all — the
+  comparison loop had nothing to iterate and passed whatever the backend
+  returned, so `empty_graph_is_empty` had been a no-op since it was written. An
+  empty expectation now asserts that the result is empty.
 - The wheel shipped without `problems/` and `semantics/`, so an installed
   package could not resolve a problem id or read the column-meaning vocabulary
   — everything PR 2 added was missing outside a checkout. The content
@@ -77,6 +111,11 @@ versions follow [PEP 440](https://peps.python.org/pep-0440/).
   they used (`ConvertedGraph.weight_attribute`) and implementations ask for it.
 
 ### Changed
+- `gigi run` renders a partition as its groups rather than a score table, and
+  `gigi compare` reports shape and regrouped-node count instead of a top key and
+  a numeric error.
+- The capability budget is 2,700, raised from 2,400. Third raise in three PRs;
+  PLAN.md argues it should be the last.
 - `gigi run` and `gigi compare` take `--dataset/-d`; `--graph/-g` still works.
   `gigi datasets` gained a `kind` column and reports shape per kind.
 - `gigi review` no longer suggests writing a NetworkX implementation of a

@@ -13,8 +13,8 @@ from rich.table import Table
 from gigi import registry, runstore
 from gigi.backends import available_backends, backend_versions
 from gigi.cli.app import app, console, parse_overrides
-from gigi.data import list_datasets
-from gigi.data import describe, load_dataset, profile_dataset
+from gigi.data import describe, list_datasets, load_dataset, profile_dataset
+from gigi.models import OutputKind, PartitionResult
 from gigi.harness import compare as compare_engines
 from gigi.harness import run as run_algorithm
 from gigi.harness import runnable_backends
@@ -101,14 +101,46 @@ def run(
         params_table.add_row(str(left[0]), str(left[1]), str(right[0]), str(right[1]))
     console.print(params_table)
 
-    # "node" for a node score, "pair" for a similarity score: the key means
-    # different things and the header should say which.
-    key_label = "pair" if result.result.kind.value == "similarity_score" else "node"
-    scores = Table(key_label, spec.output.score_name or "score")
-    ranked = sorted(result.result.scores.items(), key=lambda kv: -kv[1])
-    for key, score in ranked:
-        scores.add_row(key, f"{score:.8f}")
-    console.print(scores)
+    console.print(_result_table(spec, result.result))
+
+
+# What the key means differs by output kind, and so does what is worth showing:
+# a ranking for scores, the groups themselves for a partition. Naming the column
+# correctly is most of the job -- a column headed "node" over a list of pair ids
+# is worse than no header.
+KEY_LABELS = {"similarity_score": "pair", "node_score": "node"}
+
+
+def _result_table(spec, result) -> Table:
+    """One result, rendered as whatever it actually is."""
+    if isinstance(result, PartitionResult):
+        table = Table(spec.output.label_name or "component", "size", "members")
+        groups = sorted(result.groups(), key=lambda g: (-len(g), sorted(g)))
+        for members in groups:
+            ordered = sorted(members, key=lambda k: result.assignments[k])
+            label = result.assignments[next(iter(ordered))]
+            table.add_row(label, str(len(members)), ", ".join(sorted(members)))
+        return table
+
+    table = Table(KEY_LABELS.get(result.kind.value, "key"), spec.output.score_name or "score")
+    for key, score in sorted(result.scores.items(), key=lambda kv: -kv[1]):
+        table.add_row(key, f"{score:.8f}")
+    return table
+
+
+def _headline(result) -> str:
+    """The one-line summary of a result, for the comparison table.
+
+    For scores that is the top-ranked key. For a partition there is no ranking,
+    so it is the shape: how many groups, and how big the largest is.
+    """
+    if result is None:
+        return "-"
+    if isinstance(result, PartitionResult):
+        sizes = result.sizes()
+        groups = "group" if len(sizes) == 1 else "groups"
+        return f"{len(sizes)} {groups}, largest {sizes[0] if sizes else 0}"
+    return max(result.scores, key=lambda k: result.scores[k]) if result.scores else "-"
 
 
 @app.command()
@@ -134,22 +166,35 @@ def compare(
         allow_frontier=allow_frontier,
     )
 
-    table = Table("backend", "version", "status", "ms", "top key", "max abs error", "agrees")
+    # A partition has no "max abs error" and no top-ranked key, so the two
+    # result-shaped columns are named for what each kind actually has.
+    partition = spec.output.kind is OutputKind.partition
+    table = Table(
+        "backend",
+        "version",
+        "status",
+        "ms",
+        "shape" if partition else "top key",
+        "regrouped" if partition else "max abs error",
+        "agrees",
+    )
     metrics = {c.backend_b: c for c in comparisons}
     for result in runs:
         comparison = metrics.get(result.backend)
-        top = (
-            max(result.result.scores, key=lambda n: result.result.scores[n])
-            if result.result
-            else "-"
-        )
+        top = _headline(result.result)
+        if comparison is None:
+            difference = "baseline"
+        elif partition:
+            difference = f"{int(comparison.metrics.get('keys_grouped_differently', 0))} node(s)"
+        else:
+            difference = f"{comparison.metrics.get('max_abs_error', 0):.3e}"
         table.add_row(
             result.backend,
             result.backend_version or "-",
             result.status.value,
             f"{result.total_duration_ms:.1f}",
             top,
-            "baseline" if comparison is None else f"{comparison.metrics.get('max_abs_error', 0):.3e}",
+            difference,
             "-" if comparison is None else ("yes" if comparison.equivalent else "[red]NO[/red]"),
         )
     console.print(table)

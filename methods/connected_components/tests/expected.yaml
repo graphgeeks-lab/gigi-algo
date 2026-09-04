@@ -1,0 +1,128 @@
+# Known answers for connected components. Each `derived` says where the expected
+# answer came from -- never from running the code. See the pagerank file for why.
+#
+# The expected value is a *grouping*, written as a list of lists. Order does not
+# matter, within a group or between groups, and there are no component names to
+# get wrong: a quotient set has elements, not names. A case that pinned labels
+# would be asserting something the definition does not say.
+
+cases:
+  - id: two_islands
+    description: Two pairs with nothing between them.
+    derived: >
+      Definition. a-b is a path, c-d is a path, and no path joins the two pairs
+      because no edge does. Two equivalence classes.
+    graph:
+      directed: false
+      edges: [[a, b], [c, d]]
+    expected_components: [[a, b], [c, d]]
+
+  - id: isolated_node_is_its_own_component
+    description: A node with no edges at all.
+    derived: >
+      Reflexivity. The relation is an equivalence relation, so every node is
+      connected to itself whether or not it has an edge -- which makes a lone
+      node a component of one. This is the case an implementation that walks
+      edges rather than nodes gets wrong.
+    graph:
+      directed: false
+      edges: [[a, b]]
+      nodes: [a, b, lonely]
+    expected_components: [[a, b], [lonely]]
+
+  - id: direction_ignored_under_weak
+    description: A directed path, asked the weak question.
+    derived: >
+      Definition of weak connectivity: edge direction is discarded first, so
+      a->b->c becomes a-b-c, which is one path through all three.
+    graph:
+      directed: true
+      edges: [[a, b], [b, c]]
+    parameters: {mode: weak}
+    expected_components: [[a, b, c]]
+
+  - id: direction_respected_under_strong
+    description: The same directed path, asked the strong question.
+    derived: >
+      Definition of strong connectivity: a reaches c but c reaches nothing, so
+      no two of the three reach each other both ways. Three classes of one.
+      This is the case that proves `mode` is doing something.
+    graph:
+      directed: true
+      edges: [[a, b], [b, c]]
+    parameters: {mode: strong}
+    expected_components: [[a], [b], [c]]
+
+  - id: a_cycle_is_one_strong_component
+    description: A directed triangle.
+    derived: >
+      By construction. a->b->c->a means every node reaches every other by going
+      round, so all three are mutually reachable and the strong and weak answers
+      coincide. The complement of the case above: same three nodes, one more
+      edge, one component instead of three.
+    graph:
+      directed: true
+      edges: [[a, b], [b, c], [c, a]]
+    parameters: {mode: strong}
+    expected_components: [[a, b, c]]
+
+  - id: self_loop_adds_no_reachability
+    description: A node pointing at itself.
+    derived: >
+      Reflexivity again. A self loop asserts that a is connected to a, which the
+      equivalence relation already guarantees, so it cannot change the grouping.
+      b stays separate because no edge joins it to anything.
+    graph:
+      directed: true
+      edges: [[a, a]]
+      nodes: [a, b]
+    parameters: {mode: weak}
+    expected_components: [[a], [b]]
+
+  - id: parallel_edges_add_no_reachability
+    description: The same edge twice.
+    derived: >
+      A second copy of a->b repeats a path that already exists, and repetition
+      does not create reachability. The grouping is what it would be with one
+      edge. Paired with the case above because degree_centrality found rustworkx
+      treating multigraph edges differently from the others -- so "multigraphs
+      behave the same everywhere" is checked here, not assumed.
+    graph:
+      directed: true
+      edges: [[a, b], [a, b]]
+    parameters: {mode: weak}
+    expected_components: [[a, b]]
+
+  - id: disconnected_fixture_by_hand
+    description: The disconnected-small fixture, read off the edge list.
+    derived: >
+      Hand trace of datasets/disconnected-small/edges.csv: n1-n2, n2-n3 chain
+      the first three; n4-n5 the next two; n6 appears only in nodes.csv and has
+      no edges, so it stands alone. Three components, and the third exists only
+      because the node table declares it.
+    dataset: disconnected-small
+    parameters: {mode: weak}
+    expected_components: [[n1, n2, n3], [n4, n5], [n6]]
+
+  - id: two_clusters_weak
+    description: The two-clusters-directed fixture, asked the weak question.
+    derived: >
+      Hand trace. Ignoring direction, a-b-c-d is one path through all four, so
+      one component. The single edge b->c is what joins them, and weakly it does
+      not matter which way it points.
+    dataset: two-clusters-directed
+    parameters: {mode: weak}
+    expected_components: [[a, b, c, d]]
+
+  - id: two_clusters_strong
+    description: The same fixture, asked the strong question.
+    derived: >
+      Hand trace. a and b reach each other (a->b, b->a) and so do c and d. But
+      b->c is the only edge between the pairs and nothing returns, so c does not
+      reach a. Two classes. This is the case whose condensation is a real DAG --
+      one component pointing at another with no way back -- which is what makes
+      the strong branch of `components_are_maximal` a genuine check rather than
+      a vacuous one.
+    dataset: two-clusters-directed
+    parameters: {mode: strong}
+    expected_components: [[a, b], [c, d]]

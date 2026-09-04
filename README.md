@@ -90,17 +90,38 @@ That second check is what turns a backend upgrade into a signal instead of a sur
 
 | | |
 |---|---|
-| Methods | `pagerank`, `degree_centrality`, `cosine_similarity` |
+| Methods | `pagerank`, `degree_centrality`, `connected_components`, `cosine_similarity` |
 | Backends | `reference`, `networkx`, `igraph`, `rustworkx`, `scipy`, `sklearn` |
-| Fixtures | 10 small adversarial graphs and 3 vector sets, including the degenerate cases of each |
+| Fixtures | 11 small adversarial graphs and 3 vector sets, including the degenerate cases of each |
 | Divergences | 7, all reproduced by CI |
-| Output kinds | `node_score`, `similarity_score` |
-| Invariants | 10, checked on every backend and fixture |
-| Known answers | 25 hand-derived cases the reference must reproduce |
+| Output kinds | `node_score`, `similarity_score`, `partition` |
+| Invariants | 12, checked on every backend and fixture |
+| Known answers | 35 hand-derived cases the reference must reproduce |
+| Problems | 7 questions, including one nothing here answers |
 | Families | 17 across 2 domains, covering the roadmap |
 | Attribution | three layers: origin, Gigi credits, divergence discovery |
 
-Coming next: `connected_components` and `bfs`, which bring partition and path comparison.
+Coming next: `bfs`, which brings path comparison.
+
+### Agreement is a finding too
+
+`connected_components` runs on four backends across eleven fixtures and they
+**all agree** — on the empty graph, the isolated node, the self loop, the
+duplicate edge. The same fixtures split three backends three ways on
+`degree_centrality`.
+
+That is worth recording rather than shrugging at. A registry that only ever
+captured disagreement would be a bug tracker with extra steps, and "these four
+libraries agree here" is information nobody had before it was measured. The
+reason turns out to be in the maths: components are the equivalence classes of
+reachability, and reflexivity settles the isolated node and the self loop before
+an implementation gets a chance to be creative.
+
+What the backends *do* disagree about is whether to answer at all. NetworkX
+raises on a directed graph rather than guessing weak or strong; rustworkx raises
+on strong components of an undirected graph, which igraph answers correctly. A
+disagreement about strictness, not about components — so it is recorded as a
+choice point, and `mode` makes the question explicit.
 
 ### Not only graphs
 
@@ -255,6 +276,7 @@ The short version lives in [docs/adr/](docs/adr/):
 - [Known answers and the ladder](docs/adr/0009-known-answers-and-the-ladder.md) — the oracle's only independent check
 - [General schema, narrow content](docs/adr/0010-general-schema-narrow-content.md) — graph content, method-shaped schema
 - [A dataset declares its kind](docs/adr/0011-a-dataset-declares-its-kind.md) — and a backend says what it takes
+- [A result is not always a number](docs/adr/0012-a-result-is-not-always-a-number.md) — partitions, and invariants that can see their input
 
 ## Built for readers who are not people
 

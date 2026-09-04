@@ -392,8 +392,16 @@ class KnownAnswer(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
     # Keyed the way the method's output is keyed: by node for a node score,
     # by canonical pair (`a|b`) for a similarity score.
-    expected: dict[str, float]
+    expected: dict[str, float] = Field(default_factory=dict)
+    # For a `partition`, where the expected answer is a grouping and the group
+    # *names* are meaningless. Written as a list of lists, in any order, with
+    # members in any order -- exactly as loosely as the maths allows, so a case
+    # cannot accidentally assert something the definition does not say.
+    expected_components: list[list[str]] | None = None
     tolerance: float = 1e-9
+
+    def expects_a_partition(self) -> bool:
+        return self.expected_components is not None
 
     def data(self) -> str | InlineGraph | InlineVectors | None:
         """Whatever this case is to be run on. Exactly one is set."""
