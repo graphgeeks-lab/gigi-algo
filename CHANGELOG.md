@@ -11,6 +11,27 @@ versions follow [PEP 440](https://peps.python.org/pep-0440/).
 ## [Unreleased]
 
 ### Added
+- **An agent surface, and `gigi ask`.** Gigi is now a tool a model can call,
+  rather than a thing that calls a model.
+  - **`gigi ask "..."`** answers from the registry and nothing else. No model,
+    no network, no API key. Where nothing here answers the question it says so;
+    where the question is known but unsolved (*"how do I find communities"*) it
+    says that too, and names the methods that declare it out of scope.
+  - **`gigi mcp`** serves eight tools over MCP on stdio — hand-rolled JSON-RPC,
+    no new dependency. Drop into Claude Code or Claude Desktop with
+    `{"mcpServers": {"gigi": {"command": "gigi", "args": ["mcp"]}}}`.
+  - **`gigi tools --format mcp|anthropic|openai`** emits the same tools as JSON
+    schemas for any other runtime.
+  - Agents can execute: `gigi_run`, `gigi_compare` and `gigi_verify` do real
+    work, because a registry an agent can only read is a document. `frontier`
+    methods still refuse to run without opt-in — the gate is in the harness, so
+    an agent inherits it like every other caller.
+  - `gigi ask --format context` emits grounded prompt material with the
+    instruction attached, for a model running elsewhere.
+  - `aliases:` has been declared on every method since v0.1 and read by nothing.
+    Retrieval is its first consumer.
+  See [ADR 0013](docs/adr/0013-gigi-ask-does-not-generate.md) for why `ask`
+  retrieves rather than generates.
 - **`connected_components`**, and with it `partition` — the first output kind
   that is not one number per key.
   - Four backends, eleven fixtures, forty-four runs, and **zero divergences**.
@@ -92,6 +113,9 @@ versions follow [PEP 440](https://peps.python.org/pep-0440/).
   means one.
 
 ### Fixed
+- A tool result used `error` for both "the tool call failed" and "the run
+  reported a backend failure", so a legitimate result was flagged to the model
+  as a malfunction. The run's own field is now `status_detail`.
 - A known-answer case with `expected: {}` asserted nothing at all — the
   comparison loop had nothing to iterate and passed whatever the backend
   returned, so `empty_graph_is_empty` had been a no-op since it was written. An
@@ -111,6 +135,11 @@ versions follow [PEP 440](https://peps.python.org/pep-0440/).
   they used (`ConvertedGraph.weight_attribute`) and implementations ask for it.
 
 ### Changed
+- Removed `gigi.algorithm`, `gigi.algorithms` and `gigi.inspect_graph` — three
+  duplicate names for functions that already had canonical ones, kept for a
+  v0.1 that never shipped. Use `method`, `methods` and `inspect`.
+- The capability budget is 2,800, raised from 2,700 for `ask.py`. Fourth raise
+  in four PRs; PLAN.md now carries the argument *against* itself as well as for.
 - `gigi run` renders a partition as its groups rather than a score table, and
   `gigi compare` reports shape and regrouped-node count instead of a top key and
   a numeric error.

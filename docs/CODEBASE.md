@@ -66,14 +66,15 @@ code is in the wrong place.
 
 ## Two buckets, and why the distinction matters
 
-**Capability** (~2,690 lines) is code that computes something nothing else can:
+**Capability** (~2,780 lines) is code that computes something nothing else can:
 models, registry, the data layer, adapters, harness, results, invariants,
-people.
+people, and the retrieval behind `gigi ask`.
 Growth here means the system learned a new concept — and that is what the
 budget in `tests/test_readability.py` guards.
 
-**Reporting** (~1,240 lines) re-presents what capability already computed: the
-CLI, the static site, the review summary. It grows with what we choose to
+**Reporting** (~2,390 lines) re-presents what capability already computed: the
+CLI, the static site, the review summary, and `agent/` — the same registry
+addressed by a model rather than a person. It grows with what we choose to
 *show*, which is a much cheaper kind of growth, so it is counted separately.
 
 The line is not a loophole. If something in `cli/` or `site/` starts computing

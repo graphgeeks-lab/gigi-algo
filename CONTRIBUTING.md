@@ -331,7 +331,7 @@ change than a method, and worth reviewing as one.
 
 `gigi/` has a size budget, and `tests/test_readability.py` enforces it along with the rest of the readability rules: no module over 400 code lines, a docstring on every module and every non-obvious public name, no function over 120 lines, help text on every CLI command.
 
-The budget covers **capability**, code that computes something nothing else can (models, registry, the data layer, adapters, harness, results, invariants, people). That is 2,700 lines, currently 2,688. **Reporting**, the CLI, the site, the review summary, is counted separately, because it grows with what we choose to show rather than with what the system understands. The line is not a loophole: if something in `cli/` or `site/` starts computing rather than formatting, it has moved buckets.
+The budget covers **capability**, code that computes something nothing else can (models, registry, the data layer, adapters, harness, results, invariants, people). That is 2,800 lines, currently 2,784. **Reporting**, the CLI, the site, the review summary, is counted separately, because it grows with what we choose to show rather than with what the system understands. The line is not a loophole: if something in `cli/` or `site/` starts computing rather than formatting, it has moved buckets.
 
 New here? [docs/CODEBASE.md](docs/CODEBASE.md) has a reading order that gets you through the whole thing in about ninety minutes. It is a budget, not a law, but a pull request that grows it noticeably should say what it bought.
 

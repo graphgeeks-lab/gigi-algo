@@ -145,8 +145,14 @@ def test_every_cli_command_has_help_text():
 # REPORTING re-presents what capability already computed -- the CLI, the static
 # site, the review summary. It grows with what we choose to *show*, which is a
 # different and much cheaper kind of growth.
-REPORTING = ("cli", "site", "review.py", "typst.py")
-CAPABILITY_BUDGET = 2700
+# `agent/` sits here for the same reason `cli/` and `site/` do: it re-presents
+# what the library computed, for a caller that is a model rather than a person.
+# Its handlers are calls into registry/ask/harness and its manifest is a schema
+# rendering. The retrieval that `gigi ask` needs was put in `gigi/ask.py`
+# instead, deliberately and before this line was written, because that part
+# computes -- and the bucket line is not a loophole.
+REPORTING = ("cli", "site", "agent", "review.py", "typst.py")
+CAPABILITY_BUDGET = 2800
 
 
 def _is_reporting(path: pathlib.Path) -> bool:

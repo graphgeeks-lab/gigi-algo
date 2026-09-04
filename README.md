@@ -245,6 +245,49 @@ Without `--graph` that is documentation. With it, it is advice: it reads the
 columns actually in front of you. `gigi alternatives` and `gigi related` come
 from the same structure.
 
+## Ask it something
+
+```console
+$ gigi ask "how do I find communities in my graph"
+
+Nothing here answers this.
+  the question is known: Which nodes belong together, in the sense of being
+  more densely connected to each other than to the rest?
+  problems/community_grouping.yaml -- no method claims it
+
+Explicitly not for this
+  connected_components declares community_grouping out of scope
+```
+
+That is the whole design. `gigi ask` has **no model behind it** — no network
+call, no API key — because a generated sentence in this output would look
+exactly like a verified one and carry none of the guarantee. It retrieves, it
+cites, and where the registry is silent it says so.
+
+Connected components is what people reach for when they mean communities. Gigi
+declines, and names the thing it declined to be.
+
+## For agents
+
+Gigi is a tool a model calls, not a thing that calls a model.
+
+```console
+$ gigi mcp        # eight tools over MCP on stdio
+$ gigi tools -f anthropic   # or openai, or mcp -- the same tools as JSON schemas
+```
+
+Add to Claude Code or Claude Desktop:
+
+```json
+{"mcpServers": {"gigi": {"command": "gigi", "args": ["mcp"]}}}
+```
+
+Agents get `gigi_ask`, `gigi_describe_method`, `gigi_why`, `gigi_list_methods`,
+`gigi_list_datasets`, and — the part that matters — `gigi_run`, `gigi_compare`
+and `gigi_verify`. A model can check a claim before making it. `frontier`
+methods still refuse to run without opt-in; the gate is in the harness, so an
+agent inherits it like any other caller.
+
 ## Maturity
 
 Every algorithm declares a tier, and the tier has teeth. `frontier` entries
@@ -277,6 +320,7 @@ The short version lives in [docs/adr/](docs/adr/):
 - [General schema, narrow content](docs/adr/0010-general-schema-narrow-content.md) — graph content, method-shaped schema
 - [A dataset declares its kind](docs/adr/0011-a-dataset-declares-its-kind.md) — and a backend says what it takes
 - [A result is not always a number](docs/adr/0012-a-result-is-not-always-a-number.md) — partitions, and invariants that can see their input
+- [`gigi ask` retrieves, it does not generate](docs/adr/0013-gigi-ask-does-not-generate.md) — why there is no model behind the question box
 
 ## Built for readers who are not people
 

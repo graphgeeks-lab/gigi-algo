@@ -44,16 +44,14 @@ from gigi.registry import list_methods, load_method
 from gigi.vectors import VectorData
 
 # Read-aloud aliases. `method` is canonical now that the registry is not
-# graph-only by construction; `algorithm` stays because it is the word a
-# reader reaches for when the method happens to be one.
+# graph-only by construction. `algorithm`, `algorithms` and `inspect_graph`
+# were kept alongside them for a v0.1 that never shipped -- six names for four
+# functions, in a codebase whose rule is one fact in one place -- and were
+# removed before anyone could depend on them.
 method = load_method
 methods = list_methods
-algorithm = load_method
-algorithms = list_methods
 datasets = list_datasets
 inspect = profile_dataset
-# Kept: it was the v0.1 name, and a graph is still the common case.
-inspect_graph = profile_graph
 
 __all__ = [
     "MethodSpec",
@@ -65,8 +63,6 @@ __all__ = [
     "RunResult",
     "VerificationReport",
     "__version__",
-    "algorithm",
-    "algorithms",
     "method",
     "methods",
     "available_backends",
@@ -74,7 +70,6 @@ __all__ = [
     "datasets",
     "backend_versions",
     "inspect",
-    "inspect_graph",
     "load_dataset",
     "profile_dataset",
     "list_methods",
