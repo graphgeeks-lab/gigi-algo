@@ -14,7 +14,16 @@ future agent tools call exactly these functions.
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+from importlib.metadata import PackageNotFoundError, version as _installed_version
+
+# One source of truth for the version: pyproject.toml. `uv version 0.2.0`
+# edits that file; this reads the result from the installed metadata, so there
+# is nothing here to forget to bump. The fallback only matters when the package
+# is imported from a checkout that was never installed.
+try:
+    __version__ = _installed_version("gigi-algo")
+except PackageNotFoundError:  # pragma: no cover - uninstalled checkout
+    __version__ = "0.0.0+uninstalled"
 
 from gigi.adapters import available_engines, engine_versions
 from gigi.graph import GraphData, list_datasets, load_graph, profile_graph

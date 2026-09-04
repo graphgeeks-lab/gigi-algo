@@ -96,7 +96,7 @@ def review(algorithm_id: str) -> Review:
         )
     )
 
-    report = verify(spec)
+    report = verify(spec, allow_frontier=True)
     result.checks.append(
         Check(
             "engines agree where the registry says they agree",
@@ -212,7 +212,10 @@ def _by_eye(spec, algorithm_id: str) -> list[ByEye]:
         family = registry.load_family(spec.family)
         items.append(
             ByEye(
-                question=f'Does this algorithm answer "{family.question}"?',
+                question=(
+                    "Does this algorithm answer the family's question -- "
+                    f'"{family.question.rstrip("?")}"?'
+                ),
                 where="`family` in algorithm.yaml",
                 why="A family is a question, not a label. If the answer is no, "
                 "the family is wrong even when the label sounds right.",

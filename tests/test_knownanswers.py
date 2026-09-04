@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import pytest
 
+from conftest import executable_algorithms
 from gigi import knownanswers, registry
 from gigi.harness import runnable_engines
 from gigi.models import RunStatus
 
-ALGORITHMS = registry.list_algorithms()
+# Frontier entries are excluded unless opted in; see tests/conftest.py.
+ALGORITHMS = executable_algorithms()
 
 
 def _cases():

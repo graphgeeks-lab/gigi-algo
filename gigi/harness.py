@@ -23,6 +23,7 @@ from gigi.models import (
     VerificationReport,
 )
 from gigi.invariants import check_all
+from gigi.maturity import check_runnable
 from gigi.results import compare_results, normalize_node_score
 
 REFERENCE = "reference"
@@ -82,19 +83,27 @@ def run(
     engine: str,
     graph: str | GraphData,
     parameters: dict[str, Any] | None = None,
+    allow_frontier: bool = False,
 ) -> RunResult:
     """Execute one algorithm on one engine and return a fully described run.
 
-    A failure is a RunResult with a status, never an exception: verification
-    needs to report what did not run as much as what did.
+    An *engine* failure is a RunResult with a status, never an exception:
+    verification needs to report what did not run as much as what did. A
+    *policy* refusal is different -- a frontier algorithm without opt-in raises
+    `FrontierBlocked`, because there is no result to describe and the caller
+    asked for something they are not allowed to have.
     """
     spec = _load(algorithm)
+    check_runnable(spec, allow_frontier)
     data = _load_graph(graph)
     module = get_engine(engine)
+
+    from gigi import __version__
 
     result = RunResult(
         run_id=uuid.uuid4().hex[:12],
         algorithm_id=spec.id,
+        gigi_version=__version__,
         engine=engine,
         engine_version=module.version() if module.available() else None,
         dataset_id=data.id,
@@ -151,14 +160,16 @@ def compare(
     parameters: dict[str, Any] | None = None,
     explicit: bool = True,
     baseline: str = REFERENCE,
+    allow_frontier: bool = False,
 ) -> tuple[list[RunResult], list[Comparison]]:
     """Run every engine on one graph and compare each against the baseline."""
     spec = _load(algorithm)
+    check_runnable(spec, allow_frontier)
     data = _load_graph(graph)
     params = resolve_parameters(spec, data, parameters, explicit=explicit)
 
     candidates = engines or runnable_engines(spec)
-    runs = [run(spec, engine, data, params) for engine in candidates]
+    runs = [run(spec, engine, data, params, allow_frontier=True) for engine in candidates]
     by_engine = {r.engine: r for r in runs}
 
     comparisons: list[Comparison] = []
@@ -195,6 +206,7 @@ def verify(
     algorithm: str | AlgorithmSpec,
     datasets: list[str] | None = None,
     engines: list[str] | None = None,
+    allow_frontier: bool = False,
 ) -> VerificationReport:
     """The registry's claims, checked against reality.
 
@@ -208,6 +220,9 @@ def verify(
        is stale documentation, and verification fails.
     """
     spec = _load(algorithm)
+    # Checked once here so the refusal is immediate and legible, rather than
+    # arriving from inside a loop over fixtures.
+    check_runnable(spec, allow_frontier)
     candidates = engines or runnable_engines(spec)
     dataset_ids = datasets or spec.datasets
 
@@ -222,7 +237,9 @@ def verify(
 
     for dataset_id in dataset_ids:
         data = load_graph(dataset_id)
-        runs, comparisons = compare(spec, data, engines=candidates, explicit=True)
+        runs, comparisons = compare(
+            spec, data, engines=candidates, explicit=True, allow_frontier=True
+        )
         report.runs.extend(runs)
         report.comparisons.extend(comparisons)
 
@@ -362,6 +379,7 @@ def _observe(
         parameters=detect.parameters,
         explicit=False,
         baseline=first,
+        allow_frontier=True,
     )
     subject = next((r for r in runs if r.engine == second), None)
 

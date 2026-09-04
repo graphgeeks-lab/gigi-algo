@@ -5,6 +5,19 @@ description = "An executable registry of graph algorithm semantics: run the same
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
+keywords = ["graph", "algorithms", "networkx", "igraph", "rustworkx", "verification", "reproducibility"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Software Development :: Testing",
+]
 dependencies = [
     "pydantic>=2.6",
     "pyyaml>=6.0",
@@ -30,6 +43,11 @@ dev = [
     "typst>=0.13",
 ]
 
+[project.urls]
+Homepage = "https://github.com/graphgeeks-lab/gigi-algo"
+Changelog = "https://github.com/graphgeeks-lab/gigi-algo/blob/main/CHANGELOG.md"
+Issues = "https://github.com/graphgeeks-lab/gigi-algo/issues"
+
 [project.scripts]
 gigi = "gigi.cli:app"
 
@@ -39,6 +57,19 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["gigi"]
+
+# The registry is content, not code, but an installed package without it is
+# empty. It ships under gigi/_content/ and gigi.paths falls back to it when
+# there is no checkout to walk up to.
+[tool.hatch.build.targets.wheel.force-include]
+algorithms = "gigi/_content/algorithms"
+datasets = "gigi/_content/datasets"
+families = "gigi/_content/families"
+people = "gigi/_content/people"
+
+[tool.hatch.build.targets.sdist]
+include = ["gigi", "algorithms", "datasets", "families", "people", "tests", "docs",
+           "README.md", "CHANGELOG.md", "CITATION.cff", "CONTRIBUTING.md", "PLAN.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

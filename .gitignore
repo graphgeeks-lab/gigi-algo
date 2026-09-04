@@ -8,3 +8,4 @@ __pycache__/
 /site/
 .pytest_cache/
 /plan.md
+gigi/_content/

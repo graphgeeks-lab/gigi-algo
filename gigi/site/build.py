@@ -6,6 +6,7 @@ from pathlib import Path
 
 from gigi import people, registry
 from gigi.harness import verify
+from gigi.maturity import FrontierBlocked
 from gigi.models import AlgorithmSpec, VerificationReport
 from gigi.runstore import load_report
 from gigi.site.html import INLINE, page
@@ -16,7 +17,12 @@ def collect(verify_first: bool) -> tuple[list[AlgorithmSpec], dict[str, Verifica
     specs = [registry.load_algorithm(a) for a in registry.list_algorithms()]
     reports: dict[str, VerificationReport] = {}
     for spec in specs:
-        report = verify(spec) if verify_first else load_report(spec.id)
+        try:
+            report = verify(spec) if verify_first else load_report(spec.id)
+        except FrontierBlocked:
+            # A frontier entry is published without evidence, which is the
+            # honest thing to show: it has not been verified.
+            continue
         if report:
             reports[spec.id] = report
     return specs, reports

@@ -135,3 +135,46 @@ def test_review_separates_machine_checks_from_human_ones():
     assert "By eye" in result.output
     # The definition is printed so a reviewer can check it against reference.py.
     assert "r(v)" in result.output
+
+
+def test_version_names_the_build_and_the_registry():
+    result = runner.invoke(app, ["version"])
+    assert result.exit_code == 0
+    import gigi
+
+    assert gigi.__version__ in result.output
+    # Which registry is being read is the line that catches a stale install.
+    assert "registry" in result.output
+    assert "checkout" in result.output or "packaged" in result.output
+
+
+def test_version_json_is_machine_readable():
+    import json
+
+    result = runner.invoke(app, ["version", "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert {"gigi", "python", "registry", "counts", "engines"} <= set(payload)
+    assert payload["counts"]["algorithms"] >= 1
+    assert payload["registry"]["packaged"] is False
+
+
+def test_promote_dry_run_changes_nothing():
+    from gigi import registry
+
+    before = registry.load_algorithm("degree_centrality").maturity
+    result = runner.invoke(app, ["promote", "degree_centrality", "--dry-run"])
+    assert result.exit_code == 0
+    assert "nothing was changed" in result.output
+    assert registry.load_algorithm("degree_centrality").maturity is before
+
+
+def test_promote_refuses_to_go_backwards():
+    result = runner.invoke(app, ["promote", "pagerank", "--to", "emerging"])
+    assert result.exit_code == 1
+    assert "not above it" in result.output
+
+
+def test_promote_rejects_an_unknown_tier():
+    result = runner.invoke(app, ["promote", "degree_centrality", "--to", "excellent"])
+    assert result.exit_code != 0

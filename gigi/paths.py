@@ -12,12 +12,21 @@ import os
 from pathlib import Path
 
 
-def repo_root() -> Path:
-    """Walk up from this file until we find the directory holding `algorithms/`."""
-    here = Path(__file__).resolve()
+def repo_root(start: Path | None = None) -> Path:
+    """The directory holding `algorithms/`, `datasets/`, `families/` and `people/`.
+
+    In a checkout that is the repository root, found by walking up from this
+    file. In an installed wheel there is no checkout: the same four directories
+    ship inside the package as `gigi/_content/`, and that is returned instead.
+    A checkout always wins, so editing the registry in place keeps working.
+    """
+    here = (start or Path(__file__)).resolve()
     for candidate in [here.parent, *here.parents]:
         if (candidate / "algorithms").is_dir():
             return candidate
+    packaged = here.parent / "_content"
+    if (packaged / "algorithms").is_dir():
+        return packaged
     return here.parent.parent
 
 

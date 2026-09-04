@@ -65,6 +65,9 @@ def run(
     explicit: bool = typer.Option(
         False, "--explicit", help="Pin ambiguous parameters instead of using engine defaults."
     ),
+    allow_frontier: bool = typer.Option(
+        False, "--allow-frontier", help="Run a `frontier` algorithm. See docs/MATURITY.md."
+    ),
 ) -> None:
     """Run one algorithm on one engine."""
     from gigi.harness import resolve_parameters
@@ -73,7 +76,7 @@ def run(
     data = load_graph(graph)
     params = resolve_parameters(spec, data, parse_overrides(set_), explicit=explicit)
 
-    result = run_algorithm(spec, engine, data, params)
+    result = run_algorithm(spec, engine, data, params, allow_frontier=allow_frontier)
     runstore.save_run(result)
 
     if result.status != RunStatus.ok:
@@ -110,6 +113,7 @@ def compare(
     defaults: bool = typer.Option(
         False, "--defaults", help="Use each engine's own defaults instead of pinning parameters."
     ),
+    allow_frontier: bool = typer.Option(False, "--allow-frontier"),
 ) -> None:
     """Run every engine on one graph and compare them against the reference."""
     spec = registry.load_algorithm(algorithm)
@@ -120,6 +124,7 @@ def compare(
         engines=selected,
         parameters=parse_overrides(set_),
         explicit=not defaults,
+        allow_frontier=allow_frontier,
     )
 
     table = Table("engine", "version", "status", "ms", "top node", "max abs error", "agrees")
@@ -147,14 +152,27 @@ def compare(
 def verify(
     algorithm: str = typer.Argument(None, help="Algorithm id; omit to verify all."),
     save: bool = typer.Option(True, "--save/--no-save", help="Write the report to .gigi/reports."),
+    allow_frontier: bool = typer.Option(
+        False, "--allow-frontier", help="Include `frontier` algorithms. See docs/MATURITY.md."
+    ),
 ) -> None:
     """Check the registry's claims against reality."""
+    from gigi.maturity import FrontierBlocked
+
     targets = [algorithm] if algorithm else registry.list_algorithms()
     failed = False
 
     for algorithm_id in targets:
         spec = registry.load_algorithm(algorithm_id)
-        report = verify_algorithm(spec)
+        try:
+            report = verify_algorithm(spec, allow_frontier=allow_frontier)
+        except FrontierBlocked as blocked:
+            # Verifying everything should not stop at a frontier entry, but it
+            # must not silently pretend to have checked one either.
+            console.print(f"[yellow]SKIP[/yellow] {algorithm_id} -- {blocked}")
+            if algorithm:
+                raise typer.Exit(1)
+            continue
         if save:
             runstore.save_report(report)
 
@@ -245,7 +263,18 @@ def typst(
 @app.command()
 def status() -> None:
     """What is installed and what is verifiable in this environment."""
+    from gigi.maturity import FRONTIER_ENV, frontier_allowed, gated
+
     console.print(f"engines available: {', '.join(available_engines())}")
     for algorithm_id in registry.list_algorithms():
         spec = registry.load_algorithm(algorithm_id)
-        console.print(f"  {algorithm_id}: runnable on {', '.join(runnable_engines(spec))}")
+        note = ""
+        if gated(spec):
+            note = (
+                "  [yellow](frontier: needs --allow-frontier)[/yellow]"
+                if not frontier_allowed()
+                else f"  [yellow](frontier: allowed by {FRONTIER_ENV})[/yellow]"
+            )
+        console.print(
+            f"  {algorithm_id}: runnable on {', '.join(runnable_engines(spec))}{note}"
+        )

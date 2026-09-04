@@ -592,6 +592,9 @@ class RunResult(BaseModel):
 
     run_id: str
     algorithm_id: str
+    # Which build produced this. Without it a stored run cannot be reproduced,
+    # and it is what turns a RunResult into an experiment record.
+    gigi_version: str = ""
 
     engine: str
     engine_version: str | None = None

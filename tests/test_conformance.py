@@ -14,12 +14,14 @@ from __future__ import annotations
 
 import pytest
 
+from conftest import executable_algorithms
 from gigi import registry
 from gigi.graph import load_graph
 from gigi.harness import compare, runnable_engines, verify
 from gigi.models import RunStatus
 
-ALGORITHMS = registry.list_algorithms()
+# Frontier entries are excluded unless opted in; see tests/conftest.py.
+ALGORITHMS = executable_algorithms()
 
 
 def _agreement_cases():

@@ -7,6 +7,7 @@ An algorithm is a directory. Nothing is registered in code: adding
 from __future__ import annotations
 
 import importlib.util
+import re
 from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
@@ -14,7 +15,7 @@ from types import ModuleType
 import yaml
 from pydantic import ValidationError
 
-from gigi.models import AlgorithmSpec, Family
+from gigi.models import AlgorithmSpec, Family, Maturity
 from gigi.paths import algorithms_dir, families_file
 
 
@@ -127,6 +128,26 @@ def load_algorithm(algorithm_id: str) -> AlgorithmSpec:
 # Named here so `review` can report "no igraph implementation yet" without
 # importing the adapter package, which pulls in the engines.
 ENGINE_NAMES = ("reference", "networkx", "igraph", "rustworkx")
+
+
+def set_maturity(algorithm_id: str, maturity: Maturity) -> Path:
+    """Rewrite the `maturity:` line of one algorithm.yaml.
+
+    The only write this package makes to the registry, and it exists so that
+    promotion is a checked action rather than a hand edit that skips the
+    checks. Everything else about the file is left exactly as the contributor
+    wrote it.
+    """
+    path = algorithm_dir(algorithm_id) / "algorithm.yaml"
+    text = path.read_text(encoding="utf-8")
+    updated, count = re.subn(
+        r"^maturity:.*$", f"maturity: {maturity.value}", text, count=1, flags=re.M
+    )
+    if count != 1:
+        raise RegistryError(f"{path}: could not find a `maturity:` line to rewrite")
+    path.write_text(updated, encoding="utf-8")
+    load_algorithm.cache_clear()
+    return path
 
 
 def algorithm_dir(algorithm_id: str) -> Path:

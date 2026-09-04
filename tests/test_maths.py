@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import pytest
 
+from conftest import executable_algorithms
 from gigi import invariants, registry
 from gigi.graph import list_datasets
 from gigi.harness import compare, runnable_engines
 
-ALGORITHMS = registry.list_algorithms()
+# Frontier entries are excluded unless opted in; see tests/conftest.py.
+ALGORITHMS = executable_algorithms()
 
 
 @pytest.mark.parametrize("algorithm_id", ALGORITHMS)

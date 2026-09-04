@@ -120,6 +120,123 @@ def review_command(algorithm: str) -> None:
 
 
 @app.command()
+def version(
+    as_json: bool = typer.Option(False, "--json", help="Machine-readable."),
+) -> None:
+    """Which gigi, which engines, and which registry it is reading.
+
+    The registry path matters more than it looks: an installed wheel carries
+    its own copy of the content, so this is how you tell whether you are
+    looking at your checkout or at the packaged one.
+    """
+    import json
+    import platform
+    import sys
+
+    from gigi import __version__, people
+    from gigi.adapters import ENGINES, engine_versions
+    from gigi.graph import list_datasets
+    from gigi.paths import repo_root
+
+    root = repo_root()
+    packaged = root.name == "_content"
+    algorithms = registry.list_algorithms()
+    divergences = sum(len(registry.load_algorithm(a).divergences) for a in algorithms)
+    installed = engine_versions()
+
+    if as_json:
+        print(json.dumps({
+            "gigi": __version__,
+            "python": platform.python_version(),
+            "platform": sys.platform,
+            "registry": {"path": str(root), "packaged": packaged},
+            "counts": {
+                "algorithms": len(algorithms), "datasets": len(list_datasets()),
+                "families": len(registry.list_families()),
+                "people": len(people.list_people()), "divergences": divergences,
+            },
+            "engines": {name: installed.get(name) for name in ENGINES},
+        }, indent=2))
+        return
+
+    console.print(f"[bold]gigi-algo {__version__}[/bold]")
+    console.print(f"Python {platform.python_version()} on {sys.platform}")
+    console.print()
+    console.print(f"registry  {root}")
+    console.print(f"          {'packaged with the wheel' if packaged else 'a checkout'}")
+    console.print(
+        f"          {len(algorithms)} algorithms, {len(list_datasets())} datasets, "
+        f"{len(registry.list_families())} families, {len(people.list_people())} people, "
+        f"{divergences} divergences"
+    )
+    console.print()
+    engines_table = Table("engine", "version")
+    for name in ENGINES:
+        engines_table.add_row(name, installed.get(name) or "[dim]not installed[/dim]")
+    console.print(engines_table)
+
+
+@app.command()
+def promote(
+    algorithm: str,
+    to: str = typer.Option(None, "--to", help="Target tier. Defaults to the next rung up."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Check without editing anything."),
+) -> None:
+    """Move an algorithm up the maturity ladder, if it has earned it.
+
+    Checks every requirement of the target tier and refuses if any is unmet.
+    Passing is necessary, not sufficient: promotion is still a person's
+    decision, and this command exists so that decision is made on top of the
+    checks rather than instead of them.
+    """
+    from gigi import requirements
+    from gigi.models import Maturity
+
+    spec = registry.load_algorithm(algorithm)
+    if to:
+        try:
+            target = Maturity(to)
+        except ValueError:
+            raise typer.BadParameter(f"unknown tier {to!r}") from None
+    else:
+        nxt, _ = requirements.next_tier(spec)
+        if nxt is None:
+            console.print(f"{algorithm} is already `{spec.maturity.value}`. Nothing above it.")
+            raise typer.Exit(0)
+        target = nxt
+
+    if requirements.RANK[target] <= requirements.RANK[spec.maturity] and target is not Maturity.historical:
+        console.print(
+            f"[red]{algorithm} is `{spec.maturity.value}`; `{target.value}` is not above it.[/red] "
+            "Demotion is a deliberate hand edit, not a command."
+        )
+        raise typer.Exit(1)
+
+    lacking = [
+        o for o in requirements.check(spec)
+        if not o.met and requirements.RANK[o.requirement.mandatory_from] <= requirements.RANK[target]
+    ]
+    if lacking:
+        console.print(f"[red]{algorithm} is not ready for `{target.value}`.[/red] It still lacks:")
+        for outcome in lacking:
+            console.print(f"  [red]-[/red] {outcome.requirement.description}: {outcome.detail}")
+        raise typer.Exit(1)
+
+    console.print(f"[green]{algorithm} meets every requirement of `{target.value}`.[/green]")
+    if dry_run:
+        console.print("[dim]--dry-run: nothing was changed.[/dim]")
+        raise typer.Exit(0)
+
+    path = registry.set_maturity(algorithm, target)
+    console.print(f"{spec.maturity.value} -> {target.value} in {path}")
+    console.print()
+    console.print("[bold]Still to do, by a person:[/bold]")
+    console.print("  - add a line to CHANGELOG.md saying what promotion means for a user")
+    console.print("  - have someone who did not write the entry read it (docs/REVIEWING.md)")
+    console.print("  - commit the change to algorithm.yaml")
+
+
+@app.command()
 def maths(algorithm: str) -> None:
     """The mathematics: definition, invariants, and where the definition leaves
     a choice open."""

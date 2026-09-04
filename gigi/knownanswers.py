@@ -95,7 +95,7 @@ def run_case(algorithm_id: str, case: KnownAnswer, engine: str = "reference") ->
     # win over the pins.
     parameters = resolve_parameters(spec, graph, overrides=case.parameters, explicit=True)
     try:
-        result = run(spec, engine, graph, parameters=parameters)
+        result = run(spec, engine, graph, parameters=parameters, allow_frontier=True)
     except KeyError as exc:  # unknown engine name; the harness raises, we report
         return CaseResult(case.id, engine, False, f"unknown engine: {exc}")
 

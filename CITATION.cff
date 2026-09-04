@@ -1,15 +1,11 @@
 cff-version: 1.2.0
 message: >-
-  If you use Gigi in research, please cite the software release you used. Where
-  a specific algorithm specification, verifier or divergence finding informed
-  your work, the contributors for it are recorded in that algorithm's
-  algorithm.yaml and in people/people.yaml.
+  If you use Gigi in research, please cite the software release you used. Where a specific algorithm specification, verifier or divergence finding informed
+  your work, the contributors for it are recorded in that algorithm's algorithm.yaml and in people/people.yaml.
 title: "Gigi: an executable registry of graph algorithm semantics"
 abstract: >-
-  Gigi records what graph algorithms mean, runs them across multiple engines,
-  and verifies the differences it finds. Registry claims are executable: every
-  declared cross-engine divergence is reproduced in continuous integration, and
-  an undeclared difference fails the build.
+  Gigi records what graph algorithms mean, runs them across multiple engines, and verifies the differences it finds. Registry claims are executable: every
+  declared cross-engine divergence is reproduced in continuous integration, and an undeclared difference fails the build.
 type: software
 version: 0.1.0
 license: Apache-2.0
