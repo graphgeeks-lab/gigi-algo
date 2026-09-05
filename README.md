@@ -259,13 +259,39 @@ Explicitly not for this
   connected_components declares community_grouping out of scope
 ```
 
-That is the whole design. `gigi ask` has **no model behind it** — no network
-call, no API key — because a generated sentence in this output would look
-exactly like a verified one and carry none of the guarantee. It retrieves, it
-cites, and where the registry is silent it says so.
-
 Connected components is what people reach for when they mean communities. Gigi
 declines, and names the thing it declined to be.
+
+### A model may find, but not speak
+
+Word matching cannot read paraphrase. *"Which nodes matter most"* shares no word
+with *"important"*, so it used to return degree centrality and silently drop
+PageRank — a worse answer than the registry contains, looking exactly like a
+complete one.
+
+So a model gets one job: **choosing which entries a question is about**. It
+picks ids from a catalogue of what exists, every id is checked against the
+registry, and anything invented is dropped. It cannot add a method to Gigi by
+mentioning it, and it writes no word you read — every sentence in the output is
+registry content that CI verifies.
+
+```console
+$ export ANTHROPIC_API_KEY=...       # or OPENAI_API_KEY, or run ollama
+$ gigi ask "who are the influencers in my network"
+matched by anthropic (model)
+...
+```
+
+```bash
+gigi providers          # what is configured here
+gigi ask "..." --model none    # force word matching; GIGI_MODEL sets the default
+```
+
+No key, no network, a timeout, or a model that answers with nonsense — all fall
+back to word matching. `gigi ask` works offline. And every answer says how it
+was matched, so a model's involvement is never invisible.
+
+See [ADR 0014](docs/adr/0014-a-model-may-find-but-not-speak.md).
 
 ## For agents
 
@@ -287,6 +313,52 @@ Agents get `gigi_ask`, `gigi_describe_method`, `gigi_why`, `gigi_list_methods`,
 and `gigi_verify`. A model can check a claim before making it. `frontier`
 methods still refuse to run without opt-in; the gate is in the harness, so an
 agent inherits it like any other caller.
+
+## Run it in a container
+
+Build it — there is no published image yet (see below):
+
+```bash
+docker build -t gigi .
+
+docker run --rm gigi verify
+docker run --rm gigi ask "which nodes matter most"
+```
+
+The entrypoint is `gigi`, so subcommands work as arguments. The **default**
+command is the MCP server, which is what a container is most useful for — an
+agent runtime gets a working Gigi without Python, uv, or six graph libraries on
+the host:
+
+```json
+{"mcpServers": {"gigi": {"command": "docker",
+                         "args": ["run", "-i", "--rm", "gigi", "mcp"]}}}
+```
+
+The image ships every backend, so `gigi verify` inside it means what it means
+outside it. That is most of its size, and an image that cannot run igraph and
+rustworkx cannot verify anything, which would leave nothing worth shipping.
+
+Your own registry instead of the bundled one:
+
+```bash
+docker run --rm \
+  -v "$PWD/methods:/registry/methods:ro" \
+  -e GIGI_METHODS_DIR=/registry/methods \
+  gigi verify
+```
+
+### The published image
+
+`.github/workflows/docker.yml` builds and smoke-tests on every push and
+publishes to `ghcr.io/graphgeeks-lab/gigi-algo` **on a `v*` tag only**. Until
+the first tagged release, `docker pull` from there returns `denied` — ghcr says
+that rather than `404` for a package that does not exist, which reads like an
+auth problem and is not one.
+
+After the first publish, the package is **private by default**. It has to be
+made public under the repository's *Packages* settings before an unauthenticated
+`docker pull` will work.
 
 ## Maturity
 
@@ -320,7 +392,8 @@ The short version lives in [docs/adr/](docs/adr/):
 - [General schema, narrow content](docs/adr/0010-general-schema-narrow-content.md) — graph content, method-shaped schema
 - [A dataset declares its kind](docs/adr/0011-a-dataset-declares-its-kind.md) — and a backend says what it takes
 - [A result is not always a number](docs/adr/0012-a-result-is-not-always-a-number.md) — partitions, and invariants that can see their input
-- [`gigi ask` retrieves, it does not generate](docs/adr/0013-gigi-ask-does-not-generate.md) — why there is no model behind the question box
+- [`gigi ask` retrieves, it does not generate](docs/adr/0013-gigi-ask-does-not-generate.md) — the guarantee, and what it costs
+- [A model may find, but not speak](docs/adr/0014-a-model-may-find-but-not-speak.md) — a model picks ids; the registry supplies every word
 
 ## Built for readers who are not people
 

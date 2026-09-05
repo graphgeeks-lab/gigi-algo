@@ -11,6 +11,42 @@ versions follow [PEP 440](https://peps.python.org/pep-0440/).
 ## [Unreleased]
 
 ### Added
+- **`gigi ask` can use a model to find the right entries** -- and only to find
+  them. Word overlap cannot read paraphrase: *"which nodes matter most"* shares
+  no token with *"important"*, so it returned degree centrality and silently
+  dropped PageRank. With a model, it returns both.
+  - The model picks ids from a catalogue of what exists; every id is validated
+    against the registry and anything invented is dropped. It cannot add a
+    method to Gigi by mentioning it, and it writes no word a user reads.
+  - Providers: `anthropic`, `openai` (and anything speaking its API --
+    `OPENAI_BASE_URL` covers vLLM, llama.cpp, LM Studio), `ollama` for local
+    models where nothing may leave the machine. Raw HTTP, no new dependencies.
+  - `--model auto|none|<provider>`, `GIGI_MODEL` for the default, and
+    `gigi providers` to see what is configured.
+  - Every failure degrades to word matching: no key, no network, a timeout,
+    unparseable JSON, every id invented. `gigi ask` works offline.
+  - Every answer prints how it was matched, so a model's involvement -- or a
+    silent fallback -- is never invisible.
+  See [ADR 0014](docs/adr/0014-a-model-may-find-but-not-speak.md), which amends
+  ADR 0013.
+- **A container image.** `docker build -t gigi .` today; published to
+  `ghcr.io/graphgeeks-lab/gigi-algo` for `linux/amd64` and `linux/arm64` on the
+  first `v*` tag, which has not happened yet.
+  - `ENTRYPOINT` is `gigi`, so every subcommand works as an argument:
+    `docker run --rm gigi verify`, `docker run --rm gigi ask "..."`.
+  - The default command is `mcp`, because an agent runtime starting a server is
+    the case a container helps most. `docker run -i --rm gigi` is a working MCP
+    server with no Python, uv or graph libraries on the host.
+  - Ships `[all]`, so every backend is present and `gigi verify` inside the
+    image means what it means outside it. That is most of the 617 MB, and the
+    alternative is an image that cannot do the one thing Gigi is for.
+  - Runs as a non-root user; a healthcheck that reads the registry rather than
+    just reporting a version.
+  - Bring your own registry with `-v` and `GIGI_METHODS_DIR` — the environment
+    overrides in `gigi/paths.py` all work in the image.
+  - CI builds and smoke-tests on every push: registry completeness, all six
+    backends, `gigi verify`, non-root, and an MCP handshake plus tool call.
+    Only a tag publishes.
 - **An agent surface, and `gigi ask`.** Gigi is now a tool a model can call,
   rather than a thing that calls a model.
   - **`gigi ask "..."`** answers from the registry and nothing else. No model,
@@ -135,6 +171,10 @@ versions follow [PEP 440](https://peps.python.org/pep-0440/).
   they used (`ConvertedGraph.weight_attribute`) and implementations ask for it.
 
 ### Changed
+- The capability budget is 3,000 -- the fifth raise in five releases. A number
+  that only ever goes up measures nothing, so there is now a second check that
+  cannot be satisfied by raising it: capability lines **per shipped method**,
+  which has to fall as the registry grows.
 - Removed `gigi.algorithm`, `gigi.algorithms` and `gigi.inspect_graph` — three
   duplicate names for functions that already had canonical ones, kept for a
   v0.1 that never shipped. Use `method`, `methods` and `inspect`.

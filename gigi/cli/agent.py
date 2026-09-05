@@ -4,11 +4,14 @@
     tools   the tool manifest, for any runtime that takes JSON schemas
     mcp     the same tools, served over MCP on stdio
 
-`ask` has no model behind it and makes no network call. It retrieves and it
-reports; where the registry is silent it says so. That is a deliberate ceiling:
-the thing that makes this project worth anything is that its claims are
-verified, and an answer generated rather than retrieved would carry none of
-that guarantee while looking exactly like one that did.
+`ask` will use a model to *find* the right registry entries, and never to say
+anything. A model picks ids from a catalogue; every id is validated against the
+registry; the words a user reads all come from the registry itself. Where no
+model is configured, token matching runs instead and the output is identical in
+shape -- see docs/adr/0014-a-model-may-find-but-not-speak.md.
+
+Every answer says which path matched it, because whether a model was involved
+in choosing is not something a user should have to guess.
 
 To get a *generated* answer, give the grounded context to a model that can also
 call the tools -- `gigi ask --format context` is written for that, and the MCP
@@ -18,8 +21,11 @@ server is the better version of it.
 from __future__ import annotations
 
 import json
+import os
 
 import typer
+
+from rich.table import Table
 
 from gigi import registry
 from gigi.ask import ask as ask_registry
@@ -34,13 +40,23 @@ def ask(
         "text", "--format", "-f", help="text, json, or context (grounded prompt material)."
     ),
     limit: int = typer.Option(6, "--limit", "-n", help="How many matches to consider."),
+    model: str = typer.Option(
+        None, "--model", "-m",
+        help="auto (default), none, or a provider: anthropic, openai, ollama. "
+             "A model chooses which entries match; it never writes the answer.",
+    ),
 ) -> None:
     """Ask the registry a question. Answers only from what is verified here.
 
-    No model, no network. Where nothing in the registry answers the question it
-    says so rather than offering the nearest thing, which is the whole point.
+    A configured model is used to *find* the right entries -- it reads
+    paraphrase, which word matching cannot. It selects registry ids and nothing
+    else; every word printed comes from the registry. `--model none` forces
+    word matching, and `GIGI_MODEL` sets the default.
+
+    Where nothing in the registry answers the question it says so rather than
+    offering the nearest thing, which is the whole point.
     """
-    answer = ask_registry(question, limit=limit)
+    answer = ask_registry(question, limit=limit, provider=_provider(model))
 
     if output == "json":
         from gigi.agent.tools import call
@@ -51,7 +67,11 @@ def ask(
         console.print(_context(answer))
         return
 
-    console.print(f"[bold]{question}[/bold]\n")
+    console.print(f"[bold]{question}[/bold]")
+    # Never invisible: a user is entitled to know whether a model chose these
+    # without having to ask, and to see when it silently fell back.
+    how = "word matching" if answer.matched_by == "keywords" else f"{answer.matched_by} (model)"
+    console.print(f"[dim]matched by {how}[/dim]\n")
 
     if answer.found_nothing:
         console.print("[yellow]Nothing in the registry matches this question.[/yellow]")
@@ -91,6 +111,32 @@ def ask(
             + ", ".join(f"{m.kind} {m.id}" for m in related)
             + "[/dim]"
         )
+
+
+def _provider(choice: str | None):
+    """Which model to match with, if any.
+
+    `auto` is the default because a configured key is a deliberate act, and
+    because the alternative -- silently doing worse than the machine can --
+    is a poor default for the one command aimed at people who do not yet know
+    what to search for. `GIGI_MODEL=none` turns it off everywhere.
+    """
+    from gigi.providers import first_available, get_provider
+
+    choice = (choice or os.environ.get("GIGI_MODEL") or "auto").strip().lower()
+    if choice in {"none", "off", "keywords"}:
+        return None
+    if choice == "auto":
+        return first_available()
+    try:
+        provider = get_provider(choice)
+    except KeyError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if not provider.available():
+        raise typer.BadParameter(
+            f"{choice} is not configured here. `gigi providers` shows what is."
+        )
+    return provider
 
 
 def _context(answer) -> str:
@@ -164,3 +210,34 @@ def mcp() -> None:
     from gigi.agent.mcp import serve
 
     serve()
+
+
+@app.command()
+def providers() -> None:
+    """Which model providers are configured here, and how to set one up.
+
+    A model is optional. Without one, `gigi ask` matches on words -- it works,
+    it is just worse at paraphrase.
+    """
+    from gigi.providers import PROVIDERS
+
+    table = Table("provider", "configured", "model", "how to enable")
+    setup = {
+        "anthropic": "set ANTHROPIC_API_KEY",
+        "openai": "set OPENAI_API_KEY (and OPENAI_BASE_URL for a local server)",
+        "ollama": "run ollama locally, or set OLLAMA_HOST",
+    }
+    for name, module in PROVIDERS.items():
+        ready = module.available()
+        table.add_row(
+            name,
+            "[green]yes[/green]" if ready else "no",
+            module.model() if ready else "-",
+            "" if ready else setup.get(name, ""),
+        )
+    console.print(table)
+    console.print(
+        "\n[dim]A model only chooses which registry entries match a question. "
+        "Every word `gigi ask` prints comes from the registry, with or without "
+        "one.[/dim]"
+    )

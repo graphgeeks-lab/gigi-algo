@@ -1,6 +1,13 @@
 # 0013 — `gigi ask` retrieves; it does not generate
 
-**Status:** accepted; landed with the agent surface
+**Status:** accepted, then amended by [ADR 0014](0014-a-model-may-find-but-not-speak.md)
+
+> **Amended.** The reasoning below is intact, but its scope was too
+> broad: it banned *a model* where what needed banning was *a model
+> asserting things*. A model may now choose which registry entries a
+> question is about -- it picks ids from a closed catalogue and every one
+> is validated. It still writes nothing a user reads. Everything under
+> "What is still refused" in ADR 0014 is this document, unchanged.
 
 ## Context
 

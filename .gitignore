@@ -7,5 +7,6 @@ __pycache__/
 .gigi/
 /site/
 .pytest_cache/
-/plan.md
 gigi/_content/
+.env
+PLAN.md

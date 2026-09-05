@@ -17,8 +17,10 @@ the alternative is recommending something adjacent and wrong.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
+from typing import Sequence
 
 from gigi import registry
 
@@ -70,6 +72,10 @@ class Answer:
     """
 
     question: str
+    # Which path found the matches: "keywords", or the provider's name. Shown
+    # to the user, because whether a model was involved in choosing is
+    # something they are entitled to know without asking.
+    matched_by: str = "keywords"
     matches: list[Match] = field(default_factory=list)
     confident: list[Match] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
@@ -166,14 +172,31 @@ def search(question: str, limit: int = 6) -> list[Match]:
     return found[:limit]
 
 
-def ask(question: str, limit: int = 6) -> Answer:
+def ask(question: str, limit: int = 6, provider=None) -> Answer:
     """Everything the registry has to say about one question.
 
     Problems are resolved to the methods that solve them *and* the methods that
     explicitly refuse them, because a question brought to the wrong method is
     the failure this whole registry exists to prevent.
+
+    With a `provider`, a model chooses which entries the question is about --
+    it reads paraphrase, which token overlap cannot. It selects ids and nothing
+    else; every one is validated, and everything below this line is identical
+    either way. If it returns nothing usable, keyword matching runs instead, so
+    the answer degrades rather than disappearing.
     """
-    answer = Answer(question=question, matches=search(question, limit))
+    matched_by = "keywords"
+    matches: list[Match] = []
+
+    if provider is not None:
+        matches = search_with_model(question, provider, limit)
+        if matches:
+            matched_by = getattr(provider, "NAME", "model")
+
+    if not matches:
+        matches = search(question, limit)
+
+    answer = Answer(question=question, matched_by=matched_by, matches=matches)
     if not answer.matches:
         return answer
 
@@ -203,3 +226,128 @@ def ask(question: str, limit: int = 6) -> Answer:
     # recommendation of PageRank helps nobody.
     answer.not_answered_by = [(p, m) for p, m in refused if m not in answer.answered_by]
     return answer
+
+
+# --- matching with a model ----------------------------------------------------
+#
+# Token overlap misses paraphrase, and paraphrase is how people actually ask.
+# "which nodes matter most" shares no word with "important", so keyword matching
+# returns degree centrality and silently drops PageRank.
+#
+# A model fixes that, and is allowed to do exactly one thing: choose ids from a
+# catalogue the registry supplies. It is never asked what a method does, and
+# nothing it writes reaches the user. Every id it returns is resolved against
+# the registry and dropped if it does not exist, so the failure mode of a bad
+# model is *matching nothing*, not asserting something false.
+#
+# See docs/adr/0014-a-model-may-find-but-not-speak.md.
+
+SYSTEM_PROMPT = """\
+You match a user's question to entries in a fixed catalogue of graph and data \
+analysis methods.
+
+Reply with JSON only, in this exact form:
+{"ids": ["problem_or_method_or_family_id", ...]}
+
+Rules:
+- Each catalogue line is `- <id> (<kind>): <description>`. The id is the FIRST
+  token on the line. Never return the kind, and never invent an id.
+- Return every entry that could plausibly be what the user means, best match
+  first, up to 6. Being generous here is safe: Gigi filters afterwards, and a
+  missing entry cannot be recovered later.
+- Include the `problem` ids as well as the methods. A problem is the question
+  the user is really asking, and Gigi resolves it to the right method itself.
+- If the question is about something else entirely -- cooking, machine learning
+  training, the weather -- return {"ids": []}. That is a correct answer.
+- Do not explain. Do not add prose. JSON only.
+
+CATALOGUE
+%s"""
+
+# What a model returns and we refuse to believe. Not a real ranking -- the model
+# gave an order, not a score -- but high enough to clear the relevance floor,
+# because the model has already made the judgement the floor exists to make.
+MODEL_SCORE = 3.0
+
+
+def catalogue() -> str:
+    """The closed set of things a model is allowed to choose from.
+
+    Small enough to send whole -- a few kilobytes -- so there is no retrieval
+    step in front of the retrieval step. If the registry ever outgrows that,
+    this is where a first-pass filter goes.
+    """
+    lines = []
+    for kind, entry_id, title, phrases, terms in _searchable():
+        detail = next((t for t in reversed(terms) if t and t != title), "")
+        synonyms = ", ".join(dict.fromkeys(p for p in phrases if p and p != title))
+        # The id is the first token on the line. An earlier format put the
+        # kind first, as `- [problem] community_grouping: ...`, and models
+        # duly returned "problem" as an id -- correct ids alongside it, but a
+        # junk entry every time. Format is prompt.
+        line = f"- {entry_id} ({kind}): {title}"
+        if detail:
+            line += f" -- {' '.join(detail.split())[:160]}"
+        if synonyms:
+            line += f" (also called: {synonyms[:160]})"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def parse_ids(reply: str) -> list[str]:
+    """Pull the id list out of a model's reply, forgivingly.
+
+    Models wrap JSON in prose or code fences however they feel that day, and a
+    match lost to a stray backtick is a bad reason to fall back. Anything
+    unparseable yields nothing, which the caller treats as no match.
+    """
+    text = (reply or "").strip()
+    start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end <= start:
+        return []
+    try:
+        payload = json.loads(text[start : end + 1])
+    except json.JSONDecodeError:
+        return []
+
+    ids = payload.get("ids") if isinstance(payload, dict) else None
+    if not isinstance(ids, list):
+        return []
+    return [str(i) for i in ids if isinstance(i, (str, int))]
+
+
+def resolve(ids: Sequence[str]) -> list[Match]:
+    """Turn the model's ids into real entries, discarding anything invented.
+
+    This is the whole safety property. The model chose from a catalogue, but it
+    is not trusted to have done so: every id is looked up here, and one that
+    does not resolve is dropped without comment. A model cannot add a method to
+    Gigi by mentioning it.
+    """
+    known = {
+        entry_id: (kind, title) for kind, entry_id, title, _, _ in _searchable()
+    }
+    matches = []
+    for position, entry_id in enumerate(dict.fromkeys(ids)):
+        found = known.get(entry_id)
+        if found is None:
+            continue
+        kind, title = found
+        # Decreasing with position, so the model's ordering survives into the
+        # same ranking the keyword path produces.
+        matches.append(Match(kind, entry_id, title, MODEL_SCORE - position * 0.1, ("model",)))
+    return matches
+
+
+def search_with_model(question: str, provider, limit: int = 6) -> list[Match]:
+    """Ask a model which entries this question is about.
+
+    Returns an empty list on any failure -- unreachable endpoint, bad key,
+    unparseable reply, every id invented. The caller falls back to keywords,
+    because `gigi ask` working offline is not negotiable.
+    """
+    try:
+        reply = provider.complete(SYSTEM_PROMPT % catalogue(), question)
+    except Exception:
+        return []
+    return resolve(parse_ids(reply))[:limit]

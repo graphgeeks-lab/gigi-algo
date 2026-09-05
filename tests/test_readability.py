@@ -152,7 +152,7 @@ def test_every_cli_command_has_help_text():
 # instead, deliberately and before this line was written, because that part
 # computes -- and the bucket line is not a loophole.
 REPORTING = ("cli", "site", "agent", "review.py", "typst.py")
-CAPABILITY_BUDGET = 2800
+CAPABILITY_BUDGET = 3000
 
 
 def _is_reporting(path: pathlib.Path) -> bool:
@@ -167,4 +167,33 @@ def test_capability_stays_within_its_budget():
         f"capability is {capability} code lines (reporting is {reporting}), over "
         f"the {CAPABILITY_BUDGET} budget. Raise it deliberately and say in "
         f"PLAN.md what bought it, or cut something."
+    )
+
+
+# The absolute budget above has been raised in every release so far, each time
+# for a defensible reason. Five defensible reasons in a row is a ratchet, and a
+# number that only ever goes up measures nothing.
+#
+# This is the check that cannot be satisfied by raising it. The design claim is
+# that *adding a method is content, not code* -- so the library must grow more
+# slowly than the registry does. Expressed as lines of capability per shipped
+# method, that number has to fall over time, and a change that pushes it up has
+# to justify itself against the claim rather than against a budget.
+CAPABILITY_PER_METHOD = 750
+
+
+def test_capability_does_not_outgrow_the_registry():
+    """The library grows more slowly than the content, or the design claim is
+    false and the README should stop making it."""
+    from gigi.registry import list_methods
+
+    capability = sum(code_lines(p) for p in MODULES if not _is_reporting(p))
+    methods = len(list_methods())
+    ratio = capability / methods
+
+    assert ratio <= CAPABILITY_PER_METHOD, (
+        f"{capability} capability lines for {methods} methods is {ratio:.0f} per "
+        f"method, over {CAPABILITY_PER_METHOD}. Adding a method is meant to be "
+        f"content, not code. Either this change belongs in the registry rather "
+        f"than the library, or the claim in README.md needs revising."
     )
