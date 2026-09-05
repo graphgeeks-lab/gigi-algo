@@ -31,7 +31,7 @@ The two jobs, separated:
 | **finding** — which entries is this about? | a model, when configured | no: it picks from a closed catalogue, and every id is validated |
 | **saying** — what do those entries mean? | the registry, always | no: every word is content somebody wrote and CI checks |
 
-The safety property is that the answer space is *enumerable and checkable*. The model receives a catalogue of ids and returns a list of them. `ask.resolve()` looks up every one and silently drops anything that does not exist. A model cannot add a method to Gigi by mentioning it — the worst it can do is match nothing, and matching nothing falls back to word matching.
+The safety property is that the answer space is *enumerable and checkable*. The model receives a catalogue of ids and returns a list of them. `ask.resolve()` looks up every one and silently drops anything that does not exist. A model cannot add a method to Gigi by mentioning it. It can still select an irrelevant real id, so matching remains a recommendation a reader can inspect, not a correctness claim.
 
 **Every failure degrades rather than breaking.** No key, no network, a timeout, prose instead of JSON, every id invented — all of them fall through to the word matcher. `gigi ask` works offline, and that is not negotiable.
 

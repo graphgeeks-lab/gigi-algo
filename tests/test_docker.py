@@ -151,3 +151,9 @@ def test_it_does_not_run_as_root(dockerfile):
     """An agent runtime starts this unattended, which is exactly when it
     matters."""
     assert re.search(r"^USER (?!root)", dockerfile, re.M), "no non-root USER"
+
+
+def test_a_version_tag_publishes_latest_too():
+    """The public quick-start uses :latest, so the tag workflow must create it."""
+    workflow = (repo_root() / ".github" / "workflows" / "docker.yml").read_text(encoding="utf-8")
+    assert "type=raw,value=latest" in workflow

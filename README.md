@@ -20,6 +20,15 @@ NetworkX defaults to `weight="weight"`, so it ran *weighted* PageRank. igraph an
 
 ## Quick start
 
+Once the first release is published:
+
+```bash
+pip install "gigi-algo[all]"
+gigi ask "what is PageRank useful for?"
+```
+
+To work on Gigi itself, use a checkout instead:
+
 ```bash
 git clone https://github.com/graphgeeks-lab/gigi-algo
 cd gigi-algo
@@ -236,27 +245,42 @@ Connected components is what people reach for when they mean communities. Gigi d
 
 Word matching cannot read paraphrase. *"Which nodes matter most"* shares no word with *"important"*, so it used to return degree centrality and silently drop PageRank — a worse answer than the registry contains, looking exactly like a complete one.
 
-So a model gets one job: **choosing which entries a question is about**. It picks ids from a catalogue of what exists, every id is checked against the registry, and anything invented is dropped. It cannot add a method to Gigi by mentioning it, and it writes no word you read — every sentence in the output is registry content that CI verifies.
+So a model gets one job: **choosing which entries a question is about**. It picks ids from a catalogue of what exists, every id is checked against the registry, and anything invented is dropped. It cannot add a method to Gigi by mentioning it, and it writes no word you read — every sentence in the output is registry content that CI verifies. It can still choose an unhelpful real entry, which is why Gigi shows the match path and keeps its recommendations reviewable.
 
-```console
-$ export ANTHROPIC_API_KEY=...       # or OPENAI_API_KEY, or run ollama
-$ gigi ask "who are the influencers in my network"
-matched by anthropic (model)
-...
+```powershell
+# PowerShell
+$env:ANTHROPIC_API_KEY = "..."       # or OPENAI_API_KEY, or run Ollama
+gigi ask "who are the influencers in my network"
+gigi providers                        # see what is configured
+gigi ask "..." --model none           # force word matching
 ```
 
 ```bash
-gigi providers          # what is configured here
-gigi ask "..." --model none    # force word matching; GIGI_MODEL sets the default
+# macOS and Linux
+export ANTHROPIC_API_KEY=...           # or OPENAI_API_KEY, or run ollama
+gigi ask "who are the influencers in my network"
+gigi providers                         # see what is configured
+gigi ask "..." --model none            # force word matching
 ```
 
-No key, no network, a timeout, or a model that answers with nonsense — all fall back to word matching. `gigi ask` works offline. And every answer says how it was matched, so a model's involvement is never invisible.
+`GIGI_MODEL` sets the default provider (`anthropic`, `openai`, `ollama`, or `none`). No key, no network, a timeout, or a model response Gigi cannot use falls back to word matching. `gigi ask` works offline. Every answer says how it was matched, so a model's involvement is never invisible.
+
+### Start from your question
+
+| If you are… | Try this | What you get |
+|---|---|---|
+| a student learning the vocabulary | `gigi ask "what is PageRank useful for?"` | A verified method, its maturity, and the next command to understand it. |
+| a researcher comparing implementations | `gigi compare pagerank -d weighted-small --defaults` | The same method across backends, including the recorded default that changes the answer. |
+| a developer with a transaction network | `gigi ask "who are the influencers in my network"` | Model-assisted matching when configured, then registry-backed candidates to inspect with `gigi why`. |
+| curious about communities | `gigi ask "how do I find communities in my graph"` | An honest gap: Gigi names community grouping and explains why connected components is not a substitute. |
+
+The third example is deliberately phrased as a normal question rather than a registry keyword. With no configured model it may return no match; use `gigi providers` to see whether a provider is available, or start with `gigi ask "what is PageRank useful for?"` while offline.
 
 See [ADR 0014](docs/adr/0014-a-model-may-find-but-not-speak.md).
 
 ## For agents
 
-Gigi is a tool a model calls, not a thing that calls a model.
+Gigi supports both directions. `gigi ask` can use a configured model to select registry entries; an external model can call Gigi through MCP to inspect, run, compare, and verify those entries.
 
 ```console
 $ gigi mcp        # eight tools over MCP on stdio
@@ -280,6 +304,9 @@ docker build -t gigi .
 
 docker run --rm gigi verify
 docker run --rm gigi ask "which nodes matter most"
+
+# Pass a provider key only when you want model-assisted matching.
+docker run --rm -e ANTHROPIC_API_KEY gigi ask "who are the influencers in my network"
 ```
 
 The entrypoint is `gigi`, so subcommands work as arguments. The **default** command is the MCP server, which is what a container is most useful for — an agent runtime gets a working Gigi without Python, uv, or six graph libraries on the host:
@@ -302,7 +329,14 @@ docker run --rm \
 
 ### The published image
 
-`.github/workflows/docker.yml` builds and smoke-tests on every push and publishes to `ghcr.io/graphgeeks-lab/gigi-algo` **on a `v*` tag only**. Until the first tagged release, `docker pull` from there returns `denied` — ghcr says that rather than `404` for a package that does not exist, which reads like an auth problem and is not one.
+`.github/workflows/docker.yml` builds and smoke-tests on every push and publishes to `ghcr.io/graphgeeks-lab/gigi-algo` **on a `v*` tag only**. A release such as `v0.1.0` publishes `:0.1.0`, `:0.1`, and `:latest`.
+
+```bash
+docker pull ghcr.io/graphgeeks-lab/gigi-algo:latest
+docker run --rm ghcr.io/graphgeeks-lab/gigi-algo:latest ask "which nodes matter most"
+```
+
+Until the first tagged release, `docker pull` from there returns `denied` — ghcr says that rather than `404` for a package that does not exist, which reads like an auth problem and is not one.
 
 After the first publish, the package is **private by default**. It has to be made public under the repository's *Packages* settings before an unauthenticated `docker pull` will work.
 

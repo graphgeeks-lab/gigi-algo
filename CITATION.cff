@@ -13,7 +13,7 @@ repository-code: https://github.com/graphgeeks-lab/gigi-algo
 authors:
   - given-names: Dennis
     family-names: Irorere
-    affiliation: GraphGeeks
+    affiliation: GraphGeeks Labs
 keywords:
   - graph algorithms
   - verification

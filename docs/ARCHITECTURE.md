@@ -115,7 +115,7 @@ flowchart LR
 
 ## Asking it something
 
-`gigi ask` answers from the registry and nothing else. A model may help *find* the right entries; it never writes a word anyone reads.
+`gigi ask` answers from the registry and nothing else. A model may help *find* the right entries; it never writes a word anyone reads. Its selection is a recommendation, not a verified claim, so the CLI shows how each answer was matched.
 
 ```mermaid
 flowchart TB
@@ -139,7 +139,7 @@ flowchart TB
     out -->|"no match at all"| unknown["<i>not in the registry</i>"]
 ```
 
-The safety property is that the answer space is **enumerable and checkable**. A model picks from a closed catalogue and every id is looked up; anything invented is dropped, and the worst a bad model can do is match nothing. Every failure — no key, no network, unparseable reply, every id invented — degrades to word matching, so `gigi ask` works offline.
+The safety property is that the answer space is **enumerable and checkable**. A model picks from a closed catalogue and every id is looked up; anything invented is dropped. It can still choose an irrelevant real entry, so matching is visible and reviewable rather than treated as proof. Every failure — no key, no network, unparseable reply, every id invented — degrades to word matching, so `gigi ask` works offline.
 
 The two right-hand outcomes matter more than the first. *"Nothing here answers this"* is a true and useful answer, and the alternative — offering the nearest method — is exactly the mistake the registry documents.
 

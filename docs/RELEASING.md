@@ -26,6 +26,19 @@ uv version --bump stable                # 0.2.0a2 -> 0.2.0
 
 `uv version` refuses a bump that does not increase the version, so you cannot accidentally go backwards. Pre-releases publish to PyPI like anything else; `pip install gigi-algo` will not pick them up without `--pre`, and the GitHub Release is marked as a pre-release automatically.
 
+## Release-day preflight
+
+Run these from the release commit, before creating the tag:
+
+```bash
+uv run pytest -q
+uv build
+docker build -t gigi .
+docker run --rm gigi verify
+```
+
+The tag workflows repeat these checks in clean GitHub runners. This local pass catches a missing dependency, a wheel that omits registry content, or a container issue while the release is still easy to correct.
+
 ## What the workflow then does
 
 [`.github/workflows/release.yml`](../.github/workflows/release.yml) runs on the tag, in four jobs, each of which stops rather than guesses:
@@ -43,6 +56,7 @@ The rule underneath all of it: **a Release page must describe something a reader
 
 1. **Trusted publishing on PyPI.** At <https://pypi.org/manage/account/publishing/>, add a *pending publisher* for project `gigi-algo`, owner `graphgeeks-lab`, repository `gigi-algo`, workflow `release.yml`, environment `pypi`. This is what lets the workflow publish without an API token. The first successful publish claims the project name.
 2. **The `pypi` environment on GitHub.** Settings → Environments → new environment named `pypi`. Optional but recommended: add required reviewers, which turns `publish` into a human gate — the workflow checks everything, a person clicks approve, PyPI receives.
+3. **The public container package.** The Docker workflow publishes `ghcr.io/graphgeeks-lab/gigi-algo` on the same `v*` tag. After its first successful run, open the package's *Package settings* on GitHub and set its visibility to public. It publishes `:major.minor.patch`, `:major.minor`, and `:latest`; leaving the package private is why an unauthenticated `docker pull` returns `denied`.
 
 ## If something goes wrong
 
