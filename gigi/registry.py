@@ -1,7 +1,7 @@
 """Load algorithm specs and their per-backend implementations.
 
 An algorithm is a directory. Nothing is registered in code: adding
-`algorithms/<id>/method.yaml` is the entire registration step.
+`methods/<id>/method.yaml` is the entire registration step.
 """
 
 from __future__ import annotations
@@ -316,9 +316,9 @@ def implemented_backends(method_id: str) -> list[str]:
 
 @lru_cache(maxsize=None)
 def load_implementation(method_id: str, backend: str) -> ModuleType:
-    """Import `algorithms/<id>/implementations/<backend>.py` by path.
+    """Import `methods/<id>/implementations/<backend>.py` by path.
 
-    Loading by path rather than by package name keeps `algorithms/` a plain
+    Loading by path rather than by package name keeps `methods/` a plain
     content directory: no `__init__.py`, no import side effects, no packaging.
     """
     path = implementation_path(method_id, backend)

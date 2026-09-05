@@ -5,7 +5,7 @@ version it is, and how to turn `GraphData` into an `nx.MultiDiGraph`
 (or `nx.MultiGraph` for an undirected dataset).
 
 Algorithm calls live beside the algorithm, in
-`algorithms/<id>/implementations/networkx.py`, so adding an algorithm
+`methods/<id>/implementations/networkx.py`, so adding an algorithm
 never means editing this file.
 """
 

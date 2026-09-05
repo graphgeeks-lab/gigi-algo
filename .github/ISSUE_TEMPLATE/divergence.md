@@ -1,15 +1,11 @@
 ---
-name: Report a divergence
-about: Two backends disagree about the same algorithm
-labels: good-first-divergence
+name: Report a divergence about: Two backends disagree about the same algorithm labels: good-first-divergence
 ---
 
 <!-- No Python required. If you can show the numbers, we can turn it into a
      registry entry together. -->
 
-**Algorithm:**
-**Backends:**
-**Dataset or graph:**
+**Algorithm:** **Backends:** **Dataset or graph:**
 
 ## What you ran
 

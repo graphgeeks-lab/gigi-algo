@@ -65,6 +65,8 @@ The CLI, the Python API, and any future agent tooling call the same three functi
 
 ## How it works
 
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the diagrams — the three layers, the verify loop, what a result is, and how `gigi ask` decides. Start there if you want the shape before the detail.
+
 ```
 methods/pagerank/method.yaml     the claims
         │
@@ -105,45 +107,21 @@ Coming next: `bfs`, which brings path comparison.
 
 ### Agreement is a finding too
 
-`connected_components` runs on four backends across eleven fixtures and they
-**all agree** — on the empty graph, the isolated node, the self loop, the
-duplicate edge. The same fixtures split three backends three ways on
-`degree_centrality`.
+`connected_components` runs on four backends across eleven fixtures and they **all agree** — on the empty graph, the isolated node, the self loop, the duplicate edge. The same fixtures split three backends three ways on `degree_centrality`.
 
-That is worth recording rather than shrugging at. A registry that only ever
-captured disagreement would be a bug tracker with extra steps, and "these four
-libraries agree here" is information nobody had before it was measured. The
-reason turns out to be in the maths: components are the equivalence classes of
-reachability, and reflexivity settles the isolated node and the self loop before
-an implementation gets a chance to be creative.
+That is worth recording rather than shrugging at. A registry that only ever captured disagreement would be a bug tracker with extra steps, and "these four libraries agree here" is information nobody had before it was measured. The reason turns out to be in the maths: components are the equivalence classes of reachability, and reflexivity settles the isolated node and the self loop before an implementation gets a chance to be creative.
 
-What the backends *do* disagree about is whether to answer at all. NetworkX
-raises on a directed graph rather than guessing weak or strong; rustworkx raises
-on strong components of an undirected graph, which igraph answers correctly. A
-disagreement about strictness, not about components — so it is recorded as a
-choice point, and `mode` makes the question explicit.
+What the backends *do* disagree about is whether to answer at all. NetworkX raises on a directed graph rather than guessing weak or strong; rustworkx raises on strong components of an undirected graph, which igraph answers correctly. A disagreement about strictness, not about components — so it is recorded as a choice point, and `mode` makes the question explicit.
 
 ### Not only graphs
 
-`cosine_similarity` is here for a reason that is not "more content". Everything
-Gigi does well — layered provenance, executed invariants, named choice points,
-reproduced divergences, a priced maturity ladder — is about a *method*, not
-about a graph, and until PR 2b that was a claim rather than a fact.
+`cosine_similarity` is here for a reason that is not "more content". Everything Gigi does well — layered provenance, executed invariants, named choice points, reproduced divergences, a priced maturity ladder — is about a *method*, not about a graph, and until PR 2b that was a claim rather than a fact.
 
-It is now one method's worth of fact. A fixture declares its kind (`graph` or
-`vectors`); a backend declares what it accepts; a result is keyed by node or by
-pair. The harness is still three functions and gained no branch on kind.
+It is now one method's worth of fact. A fixture declares its kind (`graph` or `vectors`); a backend declares what it accepts; a result is keyed by node or by pair. The harness is still three functions and gained no branch on kind.
 
-It found something on its first fixture. A zero vector has no direction, so the
-cosine of any pair involving one is undefined — and SciPy answers `NaN`,
-scikit-learn answers `0.0`, and the reference declines to answer. The
-scikit-learn convention is the quieter and the more dangerous: a failed
-embedding is reported as *known to be dissimilar to everything*, when the truth
-is that nothing is known about it.
+It found something on its first fixture. A zero vector has no direction, so the cosine of any pair involving one is undefined — and SciPy answers `NaN`, scikit-learn answers `0.0`, and the reference declines to answer. The scikit-learn convention is the quieter and the more dangerous: a failed embedding is reported as *known to be dissimilar to everything*, when the truth is that nothing is known about it.
 
-The headline still says *graph algorithm semantics*, and will until the
-non-graph content is more than one entry. See
-[ADR 0011](docs/adr/0011-a-dataset-declares-its-kind.md).
+The headline still says *graph algorithm semantics*, and will until the non-graph content is more than one entry. See [ADR 0011](docs/adr/0011-a-dataset-declares-its-kind.md).
 
 ## Contributing
 
@@ -175,8 +153,7 @@ who created the algorithm  !=  who implemented it in Gigi
 
 `provenance:` records original authors, the original work, and structured precursors — with `attribution_notes` for the parts that resist structure. PageRank is the reason: the 1998 paper names four authors, while the recursive link-ranking idea runs back through Pinski & Narin (1976), Bonacich (1972) and Katz (1953).
 
-`gigi:` records who did the work here, by role, as ids into `people/people.yaml`. Every id must resolve or the tests fail. Profiles show
-lineage rather than a score — there is no leaderboard, on purpose.
+`gigi:` records who did the work here, by role, as ids into `people/people.yaml`. Every id must resolve or the tests fail. Profiles show lineage rather than a score — there is no leaderboard, on purpose.
 
 ## Reviewing
 
@@ -217,11 +194,7 @@ Releases are tags. `uv version --bump minor`, a changelog section, `git tag`, an
 
 ## Does it read your data the way you mean it?
 
-The same column can be the right input to two methods and mean opposite things
-to them. PageRank reads an edge weight as **strength** — higher is a stronger
-relationship. Dijkstra reads it as **cost** — higher is worse. Run both on a
-column called `distance` and you have asked two contradictory questions and
-been told nothing.
+The same column can be the right input to two methods and mean opposite things to them. PageRank reads an edge weight as **strength** — higher is a stronger relationship. Dijkstra reads it as **cost** — higher is worse. Run both on a column called `distance` and you have asked two contradictory questions and been told nothing.
 
 ```console
 $ gigi why pagerank --graph road-distances-small
@@ -241,9 +214,7 @@ Your data  (road-distances-small)
     strength, where higher means stronger. Did you intend to invert it?
 ```
 
-Without `--graph` that is documentation. With it, it is advice: it reads the
-columns actually in front of you. `gigi alternatives` and `gigi related` come
-from the same structure.
+Without `--graph` that is documentation. With it, it is advice: it reads the columns actually in front of you. `gigi alternatives` and `gigi related` come from the same structure.
 
 ## Ask it something
 
@@ -259,21 +230,13 @@ Explicitly not for this
   connected_components declares community_grouping out of scope
 ```
 
-Connected components is what people reach for when they mean communities. Gigi
-declines, and names the thing it declined to be.
+Connected components is what people reach for when they mean communities. Gigi declines, and names the thing it declined to be.
 
 ### A model may find, but not speak
 
-Word matching cannot read paraphrase. *"Which nodes matter most"* shares no word
-with *"important"*, so it used to return degree centrality and silently drop
-PageRank — a worse answer than the registry contains, looking exactly like a
-complete one.
+Word matching cannot read paraphrase. *"Which nodes matter most"* shares no word with *"important"*, so it used to return degree centrality and silently drop PageRank — a worse answer than the registry contains, looking exactly like a complete one.
 
-So a model gets one job: **choosing which entries a question is about**. It
-picks ids from a catalogue of what exists, every id is checked against the
-registry, and anything invented is dropped. It cannot add a method to Gigi by
-mentioning it, and it writes no word you read — every sentence in the output is
-registry content that CI verifies.
+So a model gets one job: **choosing which entries a question is about**. It picks ids from a catalogue of what exists, every id is checked against the registry, and anything invented is dropped. It cannot add a method to Gigi by mentioning it, and it writes no word you read — every sentence in the output is registry content that CI verifies.
 
 ```console
 $ export ANTHROPIC_API_KEY=...       # or OPENAI_API_KEY, or run ollama
@@ -287,9 +250,7 @@ gigi providers          # what is configured here
 gigi ask "..." --model none    # force word matching; GIGI_MODEL sets the default
 ```
 
-No key, no network, a timeout, or a model that answers with nonsense — all fall
-back to word matching. `gigi ask` works offline. And every answer says how it
-was matched, so a model's involvement is never invisible.
+No key, no network, a timeout, or a model that answers with nonsense — all fall back to word matching. `gigi ask` works offline. And every answer says how it was matched, so a model's involvement is never invisible.
 
 See [ADR 0014](docs/adr/0014-a-model-may-find-but-not-speak.md).
 
@@ -308,11 +269,7 @@ Add to Claude Code or Claude Desktop:
 {"mcpServers": {"gigi": {"command": "gigi", "args": ["mcp"]}}}
 ```
 
-Agents get `gigi_ask`, `gigi_describe_method`, `gigi_why`, `gigi_list_methods`,
-`gigi_list_datasets`, and — the part that matters — `gigi_run`, `gigi_compare`
-and `gigi_verify`. A model can check a claim before making it. `frontier`
-methods still refuse to run without opt-in; the gate is in the harness, so an
-agent inherits it like any other caller.
+Agents get `gigi_ask`, `gigi_describe_method`, `gigi_why`, `gigi_list_methods`, `gigi_list_datasets`, and — the part that matters — `gigi_run`, `gigi_compare` and `gigi_verify`. A model can check a claim before making it. `frontier` methods still refuse to run without opt-in; the gate is in the harness, so an agent inherits it like any other caller.
 
 ## Run it in a container
 
@@ -325,19 +282,14 @@ docker run --rm gigi verify
 docker run --rm gigi ask "which nodes matter most"
 ```
 
-The entrypoint is `gigi`, so subcommands work as arguments. The **default**
-command is the MCP server, which is what a container is most useful for — an
-agent runtime gets a working Gigi without Python, uv, or six graph libraries on
-the host:
+The entrypoint is `gigi`, so subcommands work as arguments. The **default** command is the MCP server, which is what a container is most useful for — an agent runtime gets a working Gigi without Python, uv, or six graph libraries on the host:
 
 ```json
 {"mcpServers": {"gigi": {"command": "docker",
                          "args": ["run", "-i", "--rm", "gigi", "mcp"]}}}
 ```
 
-The image ships every backend, so `gigi verify` inside it means what it means
-outside it. That is most of its size, and an image that cannot run igraph and
-rustworkx cannot verify anything, which would leave nothing worth shipping.
+The image ships every backend, so `gigi verify` inside it means what it means outside it. That is most of its size, and an image that cannot run igraph and rustworkx cannot verify anything, which would leave nothing worth shipping.
 
 Your own registry instead of the bundled one:
 
@@ -350,27 +302,15 @@ docker run --rm \
 
 ### The published image
 
-`.github/workflows/docker.yml` builds and smoke-tests on every push and
-publishes to `ghcr.io/graphgeeks-lab/gigi-algo` **on a `v*` tag only**. Until
-the first tagged release, `docker pull` from there returns `denied` — ghcr says
-that rather than `404` for a package that does not exist, which reads like an
-auth problem and is not one.
+`.github/workflows/docker.yml` builds and smoke-tests on every push and publishes to `ghcr.io/graphgeeks-lab/gigi-algo` **on a `v*` tag only**. Until the first tagged release, `docker pull` from there returns `denied` — ghcr says that rather than `404` for a package that does not exist, which reads like an auth problem and is not one.
 
-After the first publish, the package is **private by default**. It has to be
-made public under the repository's *Packages* settings before an unauthenticated
-`docker pull` will work.
+After the first publish, the package is **private by default**. It has to be made public under the repository's *Packages* settings before an unauthenticated `docker pull` will work.
 
 ## Maturity
 
-Every algorithm declares a tier, and the tier has teeth. `frontier` entries
-**refuse to run** without an explicit `--allow-frontier`, so an agent asking
-for the best available algorithm can never be handed unverified work
-silently. `emerging` and `stable` each have a stated price in
-[`gigi/requirements.py`](gigi/requirements.py); `gigi review` shows where an
-entry stands and `gigi promote` refuses a tier it has not earned.
+Every algorithm declares a tier, and the tier has teeth. `frontier` entries **refuse to run** without an explicit `--allow-frontier`, so an agent asking for the best available algorithm can never be handed unverified work silently. `emerging` and `stable` each have a stated price in [`gigi/requirements.py`](gigi/requirements.py); `gigi review` shows where an entry stands and `gigi promote` refuses a tier it has not earned.
 
-[docs/MATURITY.md](docs/MATURITY.md) covers all four tiers, how to move up,
-and how to use `frontier`.
+[docs/MATURITY.md](docs/MATURITY.md) covers all four tiers, how to move up, and how to use `frontier`.
 
 ## Vocabulary
 

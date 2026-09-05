@@ -52,3 +52,33 @@ def test_wheel_is_configured_to_ship_every_content_directory():
 def test_every_content_directory_exists_in_the_checkout():
     for directory in CONTENT:
         assert (repo_root() / directory).is_dir(), f"{directory}/ is missing"
+
+
+def test_the_sdist_ships_every_content_directory():
+    """The third list, after the wheel's force-include and the Dockerfile's COPY.
+
+    `uv build` builds the wheel *from the sdist*, so a directory missing here
+    does not ship a quiet gap -- it fails the whole release with "Forced
+    include not found". That is exactly what happened on the day of the 0.1.0
+    release: `problems/` and `semantics/` were added to the wheel's list and
+    forgotten in this one.
+    """
+    with (repo_root() / "pyproject.toml").open("rb") as handle:
+        config = tomllib.load(handle)
+    include = config["tool"]["hatch"]["build"]["targets"]["sdist"]["include"]
+
+    for directory in CONTENT:
+        assert directory in include, (
+            f"{directory}/ is not in the sdist include list, so `uv build` will "
+            f"fail when it builds the wheel from the sdist"
+        )
+
+
+def test_the_sdist_ships_the_licence():
+    """Apache-2.0 is declared in pyproject and on the container image. A source
+    distribution without the text is a licence claim with nothing behind it."""
+    with (repo_root() / "pyproject.toml").open("rb") as handle:
+        config = tomllib.load(handle)
+
+    assert "LICENSE" in config["tool"]["hatch"]["build"]["targets"]["sdist"]["include"]
+    assert (repo_root() / "LICENSE").is_file(), "LICENSE is missing from the repository"

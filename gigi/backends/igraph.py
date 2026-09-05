@@ -3,7 +3,7 @@
 Owns three things and no more: whether the library is installed, what version it is, and how to turn `GraphData` into an `ig.Graph` whose
 vertex order matches `node_ids`.
 
-Algorithm calls live beside the algorithm, in `algorithms/<id>/implementations/igraph.py`, so adding an algorithm
+Algorithm calls live beside the algorithm, in `methods/<id>/implementations/igraph.py`, so adding an algorithm
 never means editing this file.
 """
 

@@ -4,9 +4,7 @@
 
 ## Context
 
-Loaders make silent decisions — dropping bad rows, collapsing duplicates,
-coercing identifiers — and those decisions change results while looking like
-plumbing.
+Loaders make silent decisions — dropping bad rows, collapsing duplicates, coercing identifiers — and those decisions change results while looking like plumbing.
 
 ## Decision
 
@@ -26,7 +24,5 @@ Frozen for v0.1:
 ## Consequences
 
 - A malformed fixture fails loudly at load rather than quietly at analysis time.
-- String identifiers mean backends that key on integers versus strings do not
-  register as a divergence, which would be noise rather than signal.
-- Preserving duplicates makes multigraph handling a testable question, which is
-  how `duplicate-edge-small` earns its place.
+- String identifiers mean backends that key on integers versus strings do not register as a divergence, which would be noise rather than signal.
+- Preserving duplicates makes multigraph handling a testable question, which is how `duplicate-edge-small` earns its place.

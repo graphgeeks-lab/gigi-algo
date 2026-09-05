@@ -80,9 +80,14 @@ domains = "gigi/_content/domains"
 semantics = "gigi/_content/semantics"
 people = "gigi/_content/people"
 
+# The third place content directories are listed, after the wheel force-include
+# above and the Dockerfile's COPY. `uv build` builds the wheel *from the sdist*,
+# so a directory missing here fails the whole release -- not with a quiet gap,
+# but with "Forced include not found".
 [tool.hatch.build.targets.sdist]
-include = ["gigi", "methods", "datasets", "families", "domains", "people", "tests", "docs",
-           "README.md", "CHANGELOG.md", "CITATION.cff", "CONTRIBUTING.md", "PLAN.md"]
+include = ["gigi", "methods", "datasets", "problems", "families", "domains", "semantics",
+           "people", "tests", "docs",
+           "LICENSE", "README.md", "CHANGELOG.md", "CITATION.cff", "CONTRIBUTING.md", "PLAN.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

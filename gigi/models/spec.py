@@ -375,7 +375,7 @@ class InlineVectors(BaseModel):
 
 
 class KnownAnswer(BaseModel):
-    """One case in `algorithms/<id>/tests/expected.yaml`.
+    """One case in `methods/<id>/tests/expected.yaml`.
 
     The point is `derived`: it says where the expected answer came from, and
     it must not be "I ran the code". A known answer obtained by symmetry, a
@@ -546,7 +546,7 @@ class Complexity(BaseModel):
 class MethodSpec(BaseModel):
     """Everything the registry claims about one algorithm.
 
-    One file, `algorithms/<id>/method.yaml`, and the only registration step
+    One file, `methods/<id>/method.yaml`, and the only registration step
     there is. Grouped roughly as: identity, attribution, mathematics,
     requirements, output, backends, findings, relationships.
     """

@@ -4,7 +4,7 @@ An adapter owns exactly three things: whether the backend is installed, what
 version it is, and how to turn `GraphData` into that backend's graph object.
 
 It does not own algorithm calls. Those live beside the algorithm, in
-`algorithms/<id>/implementations/<backend>.py`, so that adding an algorithm
+`methods/<id>/implementations/<backend>.py`, so that adding an algorithm
 never means editing `gigi/`.
 """
 

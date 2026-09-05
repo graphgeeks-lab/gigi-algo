@@ -43,10 +43,6 @@ class Match:
     id: str
     title: str
     score: float
-    matched: tuple[str, ...] = ()
-
-    def __str__(self) -> str:
-        return f"{self.kind} {self.id} ({self.score:.2f})"
 
 
 # A match has to clear both bars before it is allowed to recommend anything:
@@ -101,30 +97,27 @@ def tokens(text: str) -> set[str]:
     return {word for word in words if word not in NOISE and len(word) > 1}
 
 
-def _score(question: str, asked: set[str], phrases: list[str], terms: list[str]) -> tuple[float, list[str]]:
-    """How well one entry fits, and which of its terms did the fitting.
+def _score(question: str, asked: set[str], phrases: list[str], terms: list[str]) -> float:
+    """How well one entry fits the question.
 
     A phrase the user typed nearly verbatim ("connected components") is much
     stronger evidence than sharing the word "components", so a phrase hit is
     worth more than the tokens it contains.
     """
     score = 0.0
-    hits: list[str] = []
-
     lowered = question.lower()
+
     for phrase in phrases:
         cleaned = (phrase or "").strip().lower()
         if len(cleaned) > 2 and cleaned in lowered:
             score += 2.0 + 0.1 * len(cleaned.split())
-            hits.append(phrase)
 
     for term in terms:
         overlap = tokens(term) & asked
         if overlap:
             score += len(overlap) / max(len(tokens(term)), 1)
-            hits.extend(sorted(overlap))
 
-    return score, hits
+    return score
 
 
 def _searchable():
@@ -162,11 +155,11 @@ def search(question: str, limit: int = 6) -> list[Match]:
     if not asked:
         return []
 
-    found: list[Match] = []
-    for kind, entry_id, title, phrases, terms in _searchable():
-        score, hits = _score(question, asked, phrases, terms)
-        if score:
-            found.append(Match(kind, entry_id, title, score, tuple(dict.fromkeys(hits))))
+    found = [
+        Match(kind, entry_id, title, score)
+        for kind, entry_id, title, phrases, terms in _searchable()
+        if (score := _score(question, asked, phrases, terms))
+    ]
 
     found.sort(key=lambda m: (-m.score, m.kind, m.id))
     return found[:limit]
@@ -203,28 +196,58 @@ def ask(question: str, limit: int = 6, provider=None) -> Answer:
     threshold = max(RELEVANCE_FLOOR, answer.matches[0].score * RELEVANCE_SHARE)
     answer.confident = [m for m in answer.matches if m.score >= threshold]
 
+    # The questions the user actually asked, before any method gets a say.
     answer.problems = [m.id for m in answer.confident if m.kind == "problem"]
+
+    # The best reading of the question. When nothing in the registry answers
+    # it, no method that has declared itself the wrong answer to it may be
+    # offered instead -- that substitution is the exact failure this whole
+    # registry exists to prevent, and it is what a matcher does by default.
+    #
+    #   "how do I find communities"  -> community_grouping, which nothing
+    #       answers. connected_components declares it out of scope, and also
+    #       answers component_membership, which a matcher reasonably offers as
+    #       a second reading. Without this it answers via the back door.
+    #
+    # The condition is narrow on purpose. When the top question *is* answered,
+    # a disclaimer means only "not this particular problem", and the method may
+    # still answer a different one:
+    #
+    #   "which nodes are most important" -> simple_node_importance (answered by
+    #       degree_centrality) and recursive_node_influence (answered by
+    #       PageRank). PageRank disclaims the first and answers the second.
+    #       Both are correct answers to an ambiguous question, and both are
+    #       shown.
+    top_question = answer.problems[0] if answer.problems else None
+    refused: set[str] = set()
+    if top_question and not registry.methods_for_problem(top_question):
+        refused = {
+            method_id
+            for method_id in registry.list_methods()
+            if top_question in registry.load_method(method_id).intent.not_for
+        }
+
     # A matched method's own problems count too: asking "what does pagerank do"
     # should surface the question it answers, not only the method's name.
     for match in answer.confident:
-        if match.kind == "method":
+        if match.kind == "method" and match.id not in refused:
             answer.problems.extend(registry.load_method(match.id).problems)
     answer.problems = list(dict.fromkeys(answer.problems))
 
-    refused: list[tuple[str, str]] = []
+    warned: list[tuple[str, str]] = []
     for problem_id in answer.problems:
-        answer.answered_by.extend(registry.methods_for_problem(problem_id))
+        answer.answered_by.extend(
+            m for m in registry.methods_for_problem(problem_id) if m not in refused
+        )
         for method_id in registry.list_methods():
             if problem_id in registry.load_method(method_id).intent.not_for:
-                refused.append((problem_id, method_id))
+                warned.append((problem_id, method_id))
     answer.answered_by = list(dict.fromkeys(answer.answered_by))
 
     # A method that answers one of the matched problems is being recommended,
     # so listing it as out of scope for a *different* matched problem reads as
-    # a contradiction rather than a warning. PageRank genuinely does not answer
-    # "which nodes have the most connections" -- but saying so beside a
-    # recommendation of PageRank helps nobody.
-    answer.not_answered_by = [(p, m) for p, m in refused if m not in answer.answered_by]
+    # a contradiction rather than a warning.
+    answer.not_answered_by = [(p, m) for p, m in warned if m not in answer.answered_by]
     return answer
 
 
@@ -335,7 +358,7 @@ def resolve(ids: Sequence[str]) -> list[Match]:
         kind, title = found
         # Decreasing with position, so the model's ordering survives into the
         # same ranking the keyword path produces.
-        matches.append(Match(kind, entry_id, title, MODEL_SCORE - position * 0.1, ("model",)))
+        matches.append(Match(kind, entry_id, title, MODEL_SCORE - position * 0.1))
     return matches
 
 

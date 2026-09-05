@@ -166,27 +166,27 @@ def _by_eye(spec, method_id: str) -> list[ByEye]:
     items = [
         ByEye(
             question="Does the reference implementation compute what the definition says?",
-            where=f"algorithms/{method_id}/implementations/reference.py "
+            where=f"methods/{method_id}/implementations/reference.py "
             f"beside `maths.definition`",
             why="It is the oracle every backend is checked against. The known-answer "
             "cases check it against hand-derived values; you check the rest.",
         ),
         ByEye(
             question="Are the known answers really derived, not observed?",
-            where=f"algorithms/{method_id}/tests/expected.yaml, the `derived` fields",
+            where=f"methods/{method_id}/tests/expected.yaml, the `derived` fields",
             why="A case whose expected value came from running the code checks "
             "the code against itself. Read each derivation and ask whether you "
             "could have reached the number without the software.",
         ),
         ByEye(
             question="Could someone learn the algorithm from the reference implementation?",
-            where=f"algorithms/{method_id}/implementations/reference.py",
+            where=f"methods/{method_id}/implementations/reference.py",
             why="It is a teaching artifact as much as an oracle. If it needs a "
             "comment to explain a trick, the trick probably does not belong.",
         ),
         ByEye(
             question="Do maths.md and the `maths:` block say the same thing?",
-            where=f"algorithms/{method_id}/maths.md",
+            where=f"methods/{method_id}/maths.md",
             why="The one seam in the design that nothing verifies. They are "
             "reviewed together or they drift.",
         ),
@@ -196,7 +196,7 @@ def _by_eye(spec, method_id: str) -> list[ByEye]:
         items.append(
             ByEye(
                 question="Is each divergence the backend's behaviour, and not our bug?",
-                where=f"algorithms/{method_id}/notes.md",
+                where=f"methods/{method_id}/notes.md",
                 why="A divergence entry accuses a library of doing something "
                 "surprising. It should say why that is the library's choice -- or "
                 "say plainly that the rule could not be derived.",

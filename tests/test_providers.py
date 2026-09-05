@@ -83,7 +83,10 @@ def test_the_catalogue_only_contains_things_that_exist():
     known |= {f.id for f in registry.list_families()}
 
     for line in catalogue().splitlines():
-        entry_id = line.split("]", 1)[1].split(":", 1)[0].strip()
+        # `- <id> (<kind>): ...` -- the id is the first token, which is the
+        # whole point of the format. An earlier one put the kind first and
+        # models returned "problem" as an id.
+        entry_id = line.split(" ", 1)[1].split(" ", 1)[0]
         assert entry_id in known, f"catalogue names {entry_id!r}, which does not exist"
 
 
@@ -334,3 +337,54 @@ def test_an_http_error_becomes_a_provider_error(monkeypatch):
 
     with pytest.raises(ProviderError, match="could not reach|HTTP"):
         PROVIDERS["openai"].complete("system", "question")
+
+
+# --- the substitution rule ----------------------------------------------------
+#
+# Found against the live OpenAI API, not by reasoning about it. Asked "how do I
+# find communities", gpt-4o-mini returns the right question *and* the method
+# people mistake for it *and* a second reading that method does answer:
+#
+#   ["community_grouping", "community", "connected_components",
+#    "component_membership"]
+#
+# Every id is real, so validation passes. Connected components then answered
+# via `component_membership` -- exactly the substitution the registry documents
+# as a mistake, arrived at through the back door.
+
+
+def test_a_method_cannot_substitute_for_a_question_it_disclaims():
+    """The live failure, pinned. `community_grouping` is answered by nothing;
+    `connected_components` declares it out of scope and must not be offered
+    instead, even though it does answer the second-ranked reading."""
+    provider = FakeProvider(_json(
+        "community_grouping", "community", "connected_components", "component_membership"
+    ))
+    answer = ask("how do I find communities in my graph", provider=provider)
+
+    assert answer.matched_by == "fake"
+    assert answer.unanswered, "nothing here does community detection"
+    assert answer.answered_by == []
+    assert ("community_grouping", "connected_components") in answer.not_answered_by
+
+
+def test_a_disclaimer_does_not_silence_a_method_that_answers_another_reading():
+    """The counterpart, and why the rule is narrow. "Which nodes are most
+    important" is genuinely ambiguous: degree centrality answers one reading,
+    PageRank the other, and PageRank disclaiming the first must not remove it
+    from the second."""
+    provider = FakeProvider(_json(
+        "simple_node_importance", "recursive_node_influence", "degree_centrality", "pagerank"
+    ))
+    answer = ask("which nodes are most important", provider=provider)
+
+    assert set(answer.answered_by) == {"degree_centrality", "pagerank"}
+
+
+def test_the_rule_needs_the_top_question_to_be_unanswerable():
+    """If the best reading has a method, a disclaimer means only "not this
+    particular problem" -- not "not this question"."""
+    from gigi import registry
+
+    assert not registry.methods_for_problem("community_grouping")
+    assert registry.methods_for_problem("simple_node_importance")

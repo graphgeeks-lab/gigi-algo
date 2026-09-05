@@ -2,6 +2,8 @@
 
 The most valuable contribution is an algorithm with its backend implementations and an honest account of where the backends disagree. That takes one directory and no test-writing.
 
+New to the project? [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) shows how the pieces fit together in about five minutes of diagrams.
+
 ## Setup
 
 ```bash
@@ -20,9 +22,7 @@ pip install -e ".[all]"               # all four
 
 ## The words
 
-If *divergence*, *invariant*, *choice point* or *known answer* are not yet
-obvious, read [docs/GLOSSARY.md](docs/GLOSSARY.md) first -- five minutes, and
-everything below will make sense.
+If *divergence*, *invariant*, *choice point* or *known answer* are not yet obvious, read [docs/GLOSSARY.md](docs/GLOSSARY.md) first -- five minutes, and everything below will make sense.
 
 ## Add yourself first
 
@@ -79,9 +79,7 @@ Getting an attribution *right* is a real contribution, and one that needs no Pyt
 
 **1b-ii. Name the problem, and the ones you are mistaken for.**
 
-A problem is a question stated without reference to any method, in
-`problems/<id>.yaml`. Name the ones you solve, and -- more useful to a reader --
-the ones people will reach for you by mistake:
+A problem is a question stated without reference to any method, in `problems/<id>.yaml`. Name the ones you solve, and -- more useful to a reader -- the ones people will reach for you by mistake:
 
 ```yaml
 problems:
@@ -93,14 +91,11 @@ intent:
     - cheapest_route              # they mean "shortest path"
 ```
 
-`gigi why` prints those questions under *does not answer*, with whatever does
-answer them. A method that names no problem cannot be recommended, and
-`emerging` requires one.
+`gigi why` prints those questions under *does not answer*, with whatever does answer them. A method that names no problem cannot be recommended, and `emerging` requires one.
 
 **1b-iii. Say how you read your input.**
 
-The part nothing else in the ecosystem does. If any value your method consumes
-is open to interpretation, say what you make of it:
+The part nothing else in the ecosystem does. If any value your method consumes is open to interpretation, say what you make of it:
 
 ```yaml
 parameters:
@@ -126,11 +121,7 @@ semantic_interpretations:
           than a 1 km edge.
 ```
 
-`gigi why <method> --graph <data>` then compares that against the columns a
-user actually has, and asks. Meanings come from
-`semantics/column_meanings.yaml`; a meaning not in that file can never be
-inferred, and the test suite says so. Mark a reading `dangerous` only with a
-note explaining why -- an alarm without a reason gets ignored.
+`gigi why <method> --graph <data>` then compares that against the columns a user actually has, and asks. Meanings come from `semantics/column_meanings.yaml`; a meaning not in that file can never be inferred, and the test suite says so. Mark a reading `dangerous` only with a note explaining why -- an alarm without a reason gets ignored.
 
 **1c. Fill in `maths:` and pick a `family:`.**
 
@@ -200,8 +191,7 @@ def run(graph, params):
 gigi compare betweenness_centrality --graph tiny-directed
 ```
 
-**5. When backends disagree, find out why.** Then either fix your implementation, or,  if the backends genuinely differ — record it as a
-divergence with a `detect` block, so CI reproduces the claim on every run:
+**5. When backends disagree, find out why.** Then either fix your implementation, or,  if the backends genuinely differ — record it as a divergence with a `detect` block, so CI reproduces the claim on every run:
 
 ```yaml
 divergences:
@@ -257,8 +247,7 @@ One price list, in `gigi/requirements.py`. `gigi review <algorithm>` shows which
 | `emerging` | the maths is stated; one invariant asserted on every run; two known answers, each with a real `derived`; divergences credited; `notes.md` says what was measured |
 | `stable` | every divergence has a `detect` block and a matching choice point in `maths.under_determined`; four known answers; original authors and work cited; runs on `empty` and `single-node`; two backends besides the reference |
 
-Start at `emerging` -- or `frontier` if the work is exploratory, which keeps it
-out of everything until someone opts in with `--allow-frontier`.
+Start at `emerging` -- or `frontier` if the work is exploratory, which keeps it out of everything until someone opts in with `--allow-frontier`.
 
 ```bash
 gigi review <algorithm>              # what this tier requires, and the next
@@ -266,9 +255,7 @@ gigi promote <algorithm> --dry-run   # would it pass?
 gigi promote <algorithm>             # check, then edit method.yaml
 ```
 
-`gigi promote` refuses a tier the entry has not earned, and only ever moves up.
-Passing is necessary, not sufficient: the changelog line, a second reader and
-the commit are yours. Full detail in [docs/MATURITY.md](docs/MATURITY.md).
+`gigi promote` refuses a tier the entry has not earned, and only ever moves up. Passing is necessary, not sufficient: the changelog line, a second reader and the commit are yours. Full detail in [docs/MATURITY.md](docs/MATURITY.md).
 
 ## Typeset it
 
@@ -297,8 +284,7 @@ Write the `description` as the reason it exists. "Directed graph with two sink n
 
 ## Adding a backend
 
-Rarer, and it touches `gigi/`. One file in `gigi/backends/` with `available()`, `version()` and `convert()`, plus a line in `gigi/backends/__init__.py`. Conversion happens once per backend; per-algorithm calls stay beside the
-algorithm.
+Rarer, and it touches `gigi/`. One file in `gigi/backends/` with `available()`, `version()` and `convert()`, plus a line in `gigi/backends/__init__.py`. Conversion happens once per backend; per-algorithm calls stay beside the algorithm.
 
 ## What we will push back on
 
@@ -313,21 +299,12 @@ algorithm.
 
 ### If your method does not take a graph
 
-Most of the guide above assumes a graph, because most of the registry is
-graphs. Nothing in the process changes if yours is not — but two extra things
-have to exist before your entry can, and both are cheap:
+Most of the guide above assumes a graph, because most of the registry is graphs. Nothing in the process changes if yours is not — but two extra things have to exist before your entry can, and both are cheap:
 
-- **A dataset kind that can hold your input.** `graph` and `vectors` exist. A
-  new one needs a metadata model, a loader that validates the file against that
-  metadata, a profile, and a `Converted*` that says how results are keyed. See
-  `gigi/vectors.py`, which is the whole pattern in under a hundred lines.
-- **An output kind with a comparator.** `node_score` and `similarity_score`
-  exist. A new one fails the build until `results.py` can judge two of them —
-  the same rule as an invariant that names no check.
+- **A dataset kind that can hold your input.** `graph` and `vectors` exist. A new one needs a metadata model, a loader that validates the file against that metadata, a profile, and a `Converted*` that says how results are keyed. See `gigi/vectors.py`, which is the whole pattern in under a hundred lines.
+- **An output kind with a comparator.** `node_score` and `similarity_score` exist. A new one fails the build until `results.py` can judge two of them — the same rule as an invariant that names no check.
 
-If your method needs neither, you are adding content and not schema, which is
-the easy case. If it needs both, say so in the pull request: it is a bigger
-change than a method, and worth reviewing as one.
+If your method needs neither, you are adding content and not schema, which is the easy case. If it needs both, say so in the pull request: it is a bigger change than a method, and worth reviewing as one.
 
 `gigi/` has a size budget, and `tests/test_readability.py` enforces it along with the rest of the readability rules: no module over 400 code lines, a docstring on every module and every non-obvious public name, no function over 120 lines, help text on every CLI command.
 
@@ -345,15 +322,11 @@ Paste the output into the description. It tells the reviewer what they do *not* 
 
 ## Releasing
 
-Maintainers only. `uv version --bump minor`, sync the citation, write the
-changelog section, tag. The workflow does the rest and refuses to guess.
-[docs/RELEASING.md](docs/RELEASING.md) has the five commands and the one-time
-PyPI setup.
+Maintainers only. `uv version --bump minor`, sync the citation, write the changelog section, tag. The workflow does the rest and refuses to guess. [docs/RELEASING.md](docs/RELEASING.md) has the five commands and the one-time PyPI setup.
 
 ## Pull requests
 
 - One algorithm, one dataset, or one fix per pull request.
 - `pytest` must pass.
-- If you found a divergence, put the numbers in the description. That is the
-  interesting part.
+- If you found a divergence, put the numbers in the description. That is the interesting part.
 - Commit messages: what changed and why, not how.

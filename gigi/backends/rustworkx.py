@@ -5,7 +5,7 @@ version it is, and how to turn `GraphData` into a `rx.PyDiGraph` (or
 `rx.PyGraph`) whose node indices match `node_ids`.
 
 Algorithm calls live beside the algorithm, in
-`algorithms/<id>/implementations/rustworkx.py`, so adding an algorithm
+`methods/<id>/implementations/rustworkx.py`, so adding an algorithm
 never means editing this file.
 """
 
