@@ -74,7 +74,8 @@ The CLI, the Python API, and any future agent tooling call the same three functi
 
 ## How it works
 
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the diagrams — the three layers, the verify loop, what a result is, and how `gigi ask` decides. Start there if you want the shape before the detail.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the diagrams: the three layers, the verify loop, what a result is, and how `gigi ask` decides.
+Start there if you want the shape before the detail.
 
 ```
 methods/pagerank/method.yaml     the claims
@@ -116,25 +117,34 @@ Coming next: `bfs`, which brings path comparison.
 
 ### Agreement is a finding too
 
-`connected_components` runs on four backends across eleven fixtures and they **all agree** — on the empty graph, the isolated node, the self loop, the duplicate edge. The same fixtures split three backends three ways on `degree_centrality`.
+`connected_components` runs on four backends across eleven fixtures and they **all agree**, including on the empty graph, isolated node, self loop, and duplicate edge.
+The same fixtures split three backends three ways on `degree_centrality`.
 
 That is worth recording rather than shrugging at. A registry that only ever captured disagreement would be a bug tracker with extra steps, and "these four libraries agree here" is information nobody had before it was measured. The reason turns out to be in the maths: components are the equivalence classes of reachability, and reflexivity settles the isolated node and the self loop before an implementation gets a chance to be creative.
 
-What the backends *do* disagree about is whether to answer at all. NetworkX raises on a directed graph rather than guessing weak or strong; rustworkx raises on strong components of an undirected graph, which igraph answers correctly. A disagreement about strictness, not about components — so it is recorded as a choice point, and `mode` makes the question explicit.
+What the backends *do* disagree about is whether to answer at all. NetworkX raises on a directed graph rather than guessing weak or strong;
+rustworkx raises on strong components of an undirected graph, which igraph answers correctly. This is about strictness, not components, so it is recorded
+as a choice point and `mode` makes the question explicit.
 
 ### Not only graphs
 
-`cosine_similarity` is here for a reason that is not "more content". Everything Gigi does well — layered provenance, executed invariants, named choice points, reproduced divergences, a priced maturity ladder — is about a *method*, not about a graph, and until PR 2b that was a claim rather than a fact.
+`cosine_similarity` is here for a reason that is not "more content". Everything Gigi does well, including layered provenance, executed invariants,
+named choice points, reproduced divergences, and a priced maturity ladder, is about a *method*, not about a graph. Until PR 2b,
+that was a claim rather than a fact.
 
 It is now one method's worth of fact. A fixture declares its kind (`graph` or `vectors`); a backend declares what it accepts; a result is keyed by node or by pair. The harness is still three functions and gained no branch on kind.
 
-It found something on its first fixture. A zero vector has no direction, so the cosine of any pair involving one is undefined — and SciPy answers `NaN`, scikit-learn answers `0.0`, and the reference declines to answer. The scikit-learn convention is the quieter and the more dangerous: a failed embedding is reported as *known to be dissimilar to everything*, when the truth is that nothing is known about it.
+It found something on its first fixture. A zero vector has no direction, so the cosine of any pair involving one is undefined.
+SciPy answers `NaN`,
+scikit-learn answers `0.0`, and the reference declines to answer. The scikit-learn convention is the quieter and more dangerous one: a failed embedding
+is reported as *known to be dissimilar to everything*, when the truth is that nothing is known about it.
 
 The headline still says *graph algorithm semantics*, and will until the non-graph content is more than one entry. See [ADR 0011](docs/adr/0011-a-dataset-declares-its-kind.md).
 
 ## Contributing
 
-Adding an algorithm means adding one directory. You do not touch `gigi/`, and you do not write any tests — the conformance suite is generated from the registry, so a new directory is covered automatically.
+Adding an algorithm means adding one directory. You do not touch `gigi/`, and you do not write any tests. The conformance suite is generated
+from the registry, so a new directory is covered automatically.
 
 ```
 methods/<your_method>/
@@ -160,9 +170,12 @@ who created the algorithm  !=  who implemented it in Gigi
                            !=  who found the divergence
 ```
 
-`provenance:` records original authors, the original work, and structured precursors — with `attribution_notes` for the parts that resist structure. PageRank is the reason: the 1998 paper names four authors, while the recursive link-ranking idea runs back through Pinski & Narin (1976), Bonacich (1972) and Katz (1953).
+`provenance:` records original authors, the original work, and structured precursors. Use `attribution_notes` for the parts that resist structure.
+PageRank is the reason: the 1998 paper names four authors, while the recursive link-ranking idea runs through Pinski & Narin (1976),
+Bonacich (1972), and Katz (1953).
 
-`gigi:` records who did the work here, by role, as ids into `people/people.yaml`. Every id must resolve or the tests fail. Profiles show lineage rather than a score — there is no leaderboard, on purpose.
+`gigi:` records who did the work here, by role, as ids into `people/people.yaml`. Every id must resolve or the tests fail. Profiles show
+lineage rather than a score. There is no leaderboard, on purpose.
 
 ## Reviewing
 
@@ -190,7 +203,8 @@ That first by-eye item is the one that matters: the reference implementation is 
 
 Maturity is priced. `gigi/requirements.py` says what `frontier`, `emerging` and `stable` each owe, `gigi review` shows exactly what promotion would take, and the test suite refuses an entry claiming a tier it has not earned.
 
-Readability is itself a checked property. `tests/test_readability.py` enforces no module over 400 code lines, a docstring on every module and every non-obvious public name, no function over 120 lines, help text on every CLI command, and a budget on library growth — so "the code is reviewable" cannot quietly stop being true.
+Readability is itself a checked property. `tests/test_readability.py` enforces no module over 400 code lines, docstrings on modules and non-obvious public names,
+functions under 120 lines, CLI help text, and a budget on library growth. That keeps "the code is reviewable" from quietly stopping being true.
 
 ## Installing a release
 
@@ -203,7 +217,9 @@ Releases are tags. `uv version --bump minor`, a changelog section, `git tag`, an
 
 ## Does it read your data the way you mean it?
 
-The same column can be the right input to two methods and mean opposite things to them. PageRank reads an edge weight as **strength** — higher is a stronger relationship. Dijkstra reads it as **cost** — higher is worse. Run both on a column called `distance` and you have asked two contradictory questions and been told nothing.
+The same column can be the right input to two methods and mean opposite things. PageRank reads an edge weight as **strength**: higher means stronger.
+Dijkstra reads it as **cost**: higher is worse. Run both on a column called `distance` and you have asked two contradictory questions
+and been told nothing.
 
 ```console
 $ gigi why pagerank --graph road-distances-small
@@ -243,9 +259,12 @@ Connected components is what people reach for when they mean communities. Gigi d
 
 ### A model may find, but not speak
 
-Word matching cannot read paraphrase. *"Which nodes matter most"* shares no word with *"important"*, so it used to return degree centrality and silently drop PageRank — a worse answer than the registry contains, looking exactly like a complete one.
+Word matching cannot read paraphrase. *"Which nodes matter most"* shares no word with *"important"*, so it used to return degree centrality and silently
+drop PageRank. That was a worse answer than the registry contains, while still looking complete.
 
-So a model gets one job: **choosing which entries a question is about**. It picks ids from a catalogue of what exists, every id is checked against the registry, and anything invented is dropped. It cannot add a method to Gigi by mentioning it, and it writes no word you read — every sentence in the output is registry content that CI verifies. It can still choose an unhelpful real entry, which is why Gigi shows the match path and keeps its recommendations reviewable.
+So a model gets one job: **choosing which entries a question is about**. It picks ids from a catalogue, checks every id against the registry,
+and drops anything invented. It cannot add a method to Gigi by mentioning it, and it writes no word you read. Every output sentence is
+registry content that CI verifies. It can still choose an unhelpful real entry, which is why Gigi shows the match path and keeps recommendations reviewable.
 
 ```powershell
 # PowerShell
@@ -293,30 +312,42 @@ Add to Claude Code or Claude Desktop:
 {"mcpServers": {"gigi": {"command": "gigi", "args": ["mcp"]}}}
 ```
 
-Agents get `gigi_ask`, `gigi_describe_method`, `gigi_why`, `gigi_list_methods`, `gigi_list_datasets`, and — the part that matters — `gigi_run`, `gigi_compare` and `gigi_verify`. A model can check a claim before making it. `frontier` methods still refuse to run without opt-in; the gate is in the harness, so an agent inherits it like any other caller.
+Agents get `gigi_ask`, `gigi_describe_method`, `gigi_why`, `gigi_list_methods`, `gigi_list_datasets`, and, most importantly, `gigi_run`, `gigi_compare`, and `gigi_verify`.
+A model can check a claim before making it. `frontier` methods still refuse to run without opt-in; the harness gate applies to every caller.
 
 ## Run it in a container
 
-Build it — there is no published image yet (see below):
+The published image includes the registry and every supported backend:
+
+```bash
+docker run --rm ghcr.io/graphgeeks-lab/gigi-algo:latest ask "which nodes matter most"
+docker run --rm ghcr.io/graphgeeks-lab/gigi-algo:latest verify
+
+# The default command starts Gigi's MCP server.
+docker run -i --rm ghcr.io/graphgeeks-lab/gigi-algo:latest
+
+# Pass a provider key only when you want model-assisted matching.
+docker run --rm -e ANTHROPIC_API_KEY \
+  ghcr.io/graphgeeks-lab/gigi-algo:latest ask "who are the influencers in my network"
+```
+
+The entrypoint is `gigi`, so subcommands work as arguments. The default command is the MCP server, which lets an agent runtime use Gigi without Python,
+uv, or graph libraries installed on the host:
+
+```json
+{"mcpServers": {"gigi": {"command": "docker", "args": ["run", "-i", "--rm",
+"ghcr.io/graphgeeks-lab/gigi-algo:latest", "mcp"]}}}
+```
+
+To build the image from this checkout instead:
 
 ```bash
 docker build -t gigi .
-
 docker run --rm gigi verify
-docker run --rm gigi ask "which nodes matter most"
-
-# Pass a provider key only when you want model-assisted matching.
-docker run --rm -e ANTHROPIC_API_KEY gigi ask "who are the influencers in my network"
 ```
 
-The entrypoint is `gigi`, so subcommands work as arguments. The **default** command is the MCP server, which is what a container is most useful for — an agent runtime gets a working Gigi without Python, uv, or six graph libraries on the host:
-
-```json
-{"mcpServers": {"gigi": {"command": "docker",
-                         "args": ["run", "-i", "--rm", "gigi", "mcp"]}}}
-```
-
-The image ships every backend, so `gigi verify` inside it means what it means outside it. That is most of its size, and an image that cannot run igraph and rustworkx cannot verify anything, which would leave nothing worth shipping.
+The image ships every backend, so `gigi verify` inside it means what it means outside it. That is most of its size, and an image
+that cannot run igraph and rustworkx cannot verify the registry.
 
 Your own registry instead of the bundled one:
 
@@ -327,18 +358,7 @@ docker run --rm \
   gigi verify
 ```
 
-### The published image
-
-`.github/workflows/docker.yml` builds and smoke-tests on every push and publishes to `ghcr.io/graphgeeks-lab/gigi-algo` **on a `v*` tag only**. A release such as `v0.1.0` publishes `:0.1.0`, `:0.1`, and `:latest`.
-
-```bash
-docker pull ghcr.io/graphgeeks-lab/gigi-algo:latest
-docker run --rm ghcr.io/graphgeeks-lab/gigi-algo:latest ask "which nodes matter most"
-```
-
-Until the first tagged release, `docker pull` from there returns `denied` — ghcr says that rather than `404` for a package that does not exist, which reads like an auth problem and is not one.
-
-After the first publish, the package is **private by default**. It has to be made public under the repository's *Packages* settings before an unauthenticated `docker pull` will work.
+`.github/workflows/docker.yml` builds and smoke-tests on every push. A `v*` tag publishes version, major-minor, and `latest` tags to `ghcr.io/graphgeeks-lab/gigi-algo`.
 
 ## Maturity
 
@@ -350,42 +370,27 @@ Every algorithm declares a tier, and the tier has teeth. `frontier` entries **re
 
 Divergence, invariant, choice point, known answer, reference, maturity -- the words this project leans on are defined once, in plain language, in [docs/GLOSSARY.md](docs/GLOSSARY.md).
 
-## Design decisions
-
-The short version lives in [docs/adr/](docs/adr/):
-
-- [Arrow in memory, CSV on disk](docs/adr/0001-arrow-in-memory-csv-on-disk.md) — fixtures must be reviewable in a diff
-- [Reference implementations optimise for readability](docs/adr/0002-reference-optimises-readability.md)
-- [The graph data contract](docs/adr/0003-graph-data-contract.md) — nulls rejected, duplicates and self loops preserved
-- [Backend defaults are never hidden](docs/adr/0004-backend-defaults-are-never-hidden.md)
-- [Divergence claims must be executable](docs/adr/0005-divergence-claims-must-be-executable.md)
-- [Maturity gates strictness](docs/adr/0006-maturity-gates-strictness.md)
-- [Attribution has layers](docs/adr/0007-attribution-has-layers.md) — never a single `inventor:` field
-- [Machine-readable first](docs/adr/0008-machine-readable-first.md) — the next reader may not be a person
-- [Known answers and the ladder](docs/adr/0009-known-answers-and-the-ladder.md) — the oracle's only independent check
-- [General schema, narrow content](docs/adr/0010-general-schema-narrow-content.md) — graph content, method-shaped schema
-- [A dataset declares its kind](docs/adr/0011-a-dataset-declares-its-kind.md) — and a backend says what it takes
-- [A result is not always a number](docs/adr/0012-a-result-is-not-always-a-number.md) — partitions, and invariants that can see their input
-- [`gigi ask` retrieves, it does not generate](docs/adr/0013-gigi-ask-does-not-generate.md) — the guarantee, and what it costs
-- [A model may find, but not speak](docs/adr/0014-a-model-may-find-but-not-speak.md) — a model picks ids; the registry supplies every word
-
 ## Built for readers who are not people
 
 An agent choosing an algorithm cannot read `maths.md`, and should not be asked to infer facts from prose. So every fact lives in structured form, and prose supplements it rather than carrying it alone:
 
-- **`maths:`** — the definition in plain text and LaTeX, the invariants, and the places the definition leaves a choice open.
+- **`maths:`**: the definition in plain text and LaTeX, the invariants, and the places the definition leaves a choice open.
 - **`invariants`** are *executed*. "Scores sum to one" is two lines of YAML, and it is then asserted on every backend, on every fixture, forever. A property whose id names no check in `gigi/invariants.py` fails the build.
 - **`under_determined`** names the choice points, where backends *could* differ, as opposed to `divergences`, which records where they *did*. That is what lets a new backend be assessed before it is ever run.
 - **`relationships`** are typed and conditioned. "See also" tells a machine nothing; "generalises eigenvector centrality, and coincides with it as damping approaches 1 on a strongly connected graph" tells it when a substitution is legitimate.
 - **`family`** resolves to `families/families.yaml`, where a family is a *question* ("Which nodes matter, and in what sense of matter?") rather than a label.
 
-`gigi export` gives all of it as one JSON document, serialised from the same models the library uses — so what a machine reads is exactly what `gigi verify` checks. The one place a language model belongs is turning a person's sentence into a typed intent; everything after that reads structure.
+`gigi export` gives all of it as one JSON document, serialised from the same models the library uses, so what a machine reads
+is exactly what `gigi verify` checks.
+The one place a language model belongs is turning a person's sentence into a typed intent; everything after that reads structure.
 
 See [ADR 0008](docs/adr/0008-machine-readable-first.md).
 
 ## What Gigi is not
 
-Not a graph backend. Not a graph database. Not a query language. Gigi does not implement fast kernels and it never reimplements NetworkX, igraph or rustworkx inside an adapter — it calls them, records exactly what they did, and tells you where they disagree.
+Not a graph backend. Not a graph database. Not a query language. Gigi does not implement fast kernels or reimplement NetworkX,
+igraph, or rustworkx inside an adapter.
+It calls them, records exactly what they did, and tells you where they disagree.
 
 ## Licence
 

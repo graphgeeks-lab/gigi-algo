@@ -60,7 +60,12 @@ The rule underneath all of it: **a Release page must describe something a reader
 
 ## If something goes wrong
 
-- **`check` failed.** Nothing was published. Fix the thing it named, delete the tag (`git tag -d v0.2.0 && git push --delete origin v0.2.0`), re-tag.
+- **`check` failed because the version is already on PyPI.** PyPI and the GitHub Release were not changed. The Docker workflow is independent and may
+  already have published the image for that tag. Do not retry the same version: bump it, update the citation and changelog,
+  then create a new tag.
+- **Other `check` failures.** PyPI and the GitHub Release were not changed. Fix the issue, delete the tag
+  (`git tag -d v0.2.0 && git push --delete origin v0.2.0`),
+  then re-tag. Check the Docker workflow separately because it runs independently.
 - **`publish` failed.** Nothing is on PyPI. Same as above.
 - **`release` failed after `publish` succeeded.** The version is on PyPI and immutable, but has no Release page. Re-run only the `release` job from the Actions tab; it re-reads PyPI and picks up where it left off. It will not publish twice — `check` would refuse a version that already exists.
 - **Wrong notes on a published Release.** Edit the Release by hand on GitHub. The workflow never overwrites an existing Release.
