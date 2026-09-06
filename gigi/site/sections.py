@@ -103,7 +103,10 @@ def maths_section(spec: MethodSpec) -> str:
 
     for formula in filter(None, [maths.definition, *maths.also]):
         latex = (
-            f'<p class="latex"><span>LaTeX</span><code>{esc(formula.latex.strip())}</code></p>'
+            f'<div class="math" data-latex="{esc(formula.latex.strip())}">'
+            f"<code>{esc(formula.latex.strip())}</code></div>"
+            f'<details class="math-source"><summary>LaTeX source</summary>'
+            f"<code>{esc(formula.latex.strip())}</code></details>"
             if formula.latex
             else ""
         )

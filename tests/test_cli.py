@@ -63,6 +63,9 @@ def test_site_build(tmp_path):
     assert result.exit_code == 0
     assert (output / "index.html").is_file()
     assert (output / "algorithms" / "pagerank.html").is_file()
+    method_page = (output / "algorithms" / "pagerank.html").read_text(encoding="utf-8")
+    assert "katex.min.js" in method_page
+    assert 'class="math" data-latex=' in method_page
 
 
 def test_origin():
