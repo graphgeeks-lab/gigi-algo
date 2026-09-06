@@ -1,0 +1,13 @@
+.venv*/
+__pycache__/
+*.pyc
+*.egg-info/
+/dist/
+/build/
+.gigi/
+/site/
+/docs/_build/
+.pytest_cache/
+gigi/_content/
+.env
+PLAN.md

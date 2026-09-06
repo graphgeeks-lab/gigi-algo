@@ -1,0 +1,40 @@
+# What a column name suggests its values mean.
+#
+# Half of the semantic conflict check. The registry knows what a method expects
+# (`semantic_role` on a parameter, `semantic_interpretations` on a method); this
+# is the guess about what the user's data actually holds, when there is no
+# semantic model to read it from.
+#
+# Two rules, and they matter more than the vocabulary:
+#
+#   1. This ASKS. It never rewrites a value, never changes a parameter, and
+#      never refuses to run. A wrong guess should cost the reader one sentence.
+#   2. It is data, not code. Adding a hint is a one-line pull request, and a
+#      column that matches nothing produces no finding rather than a bad one.
+#
+# When an Apache OSSIE semantic model is available it is better evidence than
+# any of this, and takes precedence.
+
+- meaning: distance
+  hints: [distance, dist, km, kilometres, kilometers, miles, metres, meters, length, geo_distance, haversine]
+
+- meaning: cost
+  hints: [cost, price, fee, toll, charge, expense, tariff, spend]
+
+- meaning: duration
+  hints: [duration, elapsed, seconds, minutes, hours, latency, delay, traveltime, travel_time, runtime]
+
+- meaning: relationship_strength
+  hints: [strength, weight, affinity, closeness, similarity, score, confidence, correlation]
+
+- meaning: transaction_amount
+  hints: [amount, value, total, payment, paid, transferred, revenue, volume, notional]
+
+- meaning: count
+  hints: [count, n, num, number, frequency, freq, occurrences, interactions, messages, calls]
+
+- meaning: capacity
+  hints: [capacity, bandwidth, throughput, limit, maxflow, max_flow]
+
+- meaning: probability
+  hints: [probability, prob, p, likelihood, rate, ratio, share, proportion]

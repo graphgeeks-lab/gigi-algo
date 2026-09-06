@@ -1,0 +1,30 @@
+id: simple_node_importance
+name: Simple node importance
+domain: graph
+
+question: >
+  Which nodes have the most connections?
+
+description: >
+  Rank nodes by how many relationships they have, without regard to who those
+  relationships are with. The baseline every recursive measure should be
+  compared against: when an expensive centrality ranks the top nodes the same
+  way this does, it has told you nothing you could not have had for free.
+
+input_kinds: [graph]
+output_kinds: [node_score]
+
+related_problems:
+  - recursive_node_influence
+
+ai_context:
+  instructions: >
+    Choose this when "important" means "well connected" and nothing more. It
+    is also the right first answer when the user has not yet said what they
+    mean by important, because the disagreement between this and a recursive
+    measure is itself informative.
+  synonyms:
+    - most connected
+    - hubs
+    - degree
+    - who has the most links

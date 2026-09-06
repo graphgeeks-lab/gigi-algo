@@ -1,0 +1,101 @@
+[project]
+name = "gigi-algo"
+version = "0.1.0"
+description = "An executable registry of graph algorithm semantics: run the same algorithm across backends and see where they disagree."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Dennis Irorere", email = "denironyx@gmail.com" },
+]
+maintainers = [
+    { name = "Dennis Irorere", email = "denironyx@gmail.com" },
+]
+keywords = ["graph", "algorithms", "networkx", "igraph", "rustworkx", "verification", "reproducibility", "semantic layer"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+    "pyarrow>=15.0",
+    "typer>=0.12",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+# networkx.pagerank goes through scipy, so scipy travels with the extra.
+networkx = ["networkx>=3.0", "scipy>=1.10"]
+igraph = ["python-igraph>=0.11"]
+rustworkx = ["rustworkx>=0.14"]
+# Vector backends. Not graph libraries -- see docs/ONTOLOGY.md.
+scipy = ["scipy>=1.10"]
+sklearn = ["scikit-learn>=1.3"]
+# PDF export and the Sphinx handbook. The .typ source never needs these.
+docs = ["typst>=0.13", "sphinx>=8,<9", "myst-parser>=4,<5", "sphinxcontrib-mermaid>=0.9"]
+all = [
+    "networkx>=3.0",
+    "scipy>=1.10",
+    "python-igraph>=0.11",
+    "rustworkx>=0.14",
+    "scikit-learn>=1.3",
+]
+dev = [
+    "pytest>=8.0",
+    "networkx>=3.0",
+    "scipy>=1.10",
+    "python-igraph>=0.11",
+    "rustworkx>=0.14",
+    "scikit-learn>=1.3",
+    "typst>=0.13",
+]
+
+[project.urls]
+Homepage = "https://github.com/graphgeeks-lab/gigi-algo"
+Documentation = "https://gigi-algo.readthedocs.io/"
+Changelog = "https://github.com/graphgeeks-lab/gigi-algo/blob/main/CHANGELOG.md"
+Issues = "https://github.com/graphgeeks-lab/gigi-algo/issues"
+
+[project.scripts]
+gigi = "gigi.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gigi"]
+
+# The registry is content, not code, but an installed package without it is
+# empty. It ships under gigi/_content/ and gigi.paths falls back to it when
+# there is no checkout to walk up to.
+[tool.hatch.build.targets.wheel.force-include]
+methods = "gigi/_content/methods"
+datasets = "gigi/_content/datasets"
+problems = "gigi/_content/problems"
+families = "gigi/_content/families"
+domains = "gigi/_content/domains"
+semantics = "gigi/_content/semantics"
+people = "gigi/_content/people"
+
+# The third place content directories are listed, after the wheel force-include
+# above and the Dockerfile's COPY. `uv build` builds the wheel *from the sdist*,
+# so a directory missing here fails the whole release -- not with a quiet gap,
+# but with "Forced include not found".
+[tool.hatch.build.targets.sdist]
+include = ["gigi", "methods", "datasets", "problems", "families", "domains", "semantics",
+           "people", "tests", "docs",
+           "LICENSE", "README.md", "CHANGELOG.md", "CITATION.cff", "CONTRIBUTING.md", "PLAN.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

@@ -1,0 +1,37 @@
+id: component_membership
+name: Component membership
+domain: graph
+
+question: >
+  Which nodes can reach each other at all?
+
+description: >
+  Split the graph into the groups that hold together, where "together" means
+  there is some path between any two members. Nothing about how strongly, how
+  densely, or how many hops -- reachability is a yes or no.
+
+  Usually the first question asked of an unfamiliar graph, and often the one
+  that ends the analysis: a graph that turns out to be one giant component and
+  four thousand isolated nodes is telling you about the data collection, not
+  about the domain.
+
+input_kinds: [graph]
+output_kinds: [partition]
+
+related_problems:
+  - community_grouping
+
+ai_context:
+  instructions: >
+    Recommend this before any clustering, embedding or centrality work on a
+    graph nobody has profiled yet -- the component structure decides whether
+    those methods are measuring the domain or an artefact of the join. On a
+    directed graph, always establish whether the user means weak (ignore the
+    arrows) or strong (must reach both ways) before answering; the two give
+    different answers and neither is the default everywhere.
+  synonyms:
+    - connected components
+    - which nodes are connected
+    - islands in the graph
+    - disconnected parts
+    - is the graph connected

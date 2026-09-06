@@ -1,0 +1,38 @@
+id: pairwise_vector_similarity
+name: Pairwise vector similarity
+domain: similarity
+
+question: >
+  How alike are these two things, given a numeric description of each?
+
+description: >
+  Score every pair of items by how similar their vector representations are.
+  The question that sits under retrieval, deduplication, recommendation and
+  clustering: each of those is a decision made on top of a similarity score,
+  and each inherits whatever the score decided to measure.
+
+  The trap is that "alike" is not one question. A measure that compares
+  *direction* says a long document and a short one on the same topic are
+  identical; a measure that compares *position* says they are far apart. Both
+  are defensible, and picking the wrong one answers a different question
+  convincingly.
+
+input_kinds: [vectors]
+output_kinds: [similarity_score]
+
+related_problems: []
+
+ai_context:
+  instructions: >
+    Ask what "similar" means before choosing a measure. If magnitude carries
+    meaning -- counts, amounts, sizes -- a direction-only measure such as cosine
+    is discarding it, and Euclidean distance is probably the honest answer. If
+    magnitude is an artefact of length or scale, cosine is discarding exactly
+    what should be discarded. Never present a similarity score without saying
+    which of the two it is.
+  synonyms:
+    - how similar are these
+    - nearest neighbours
+    - closest match
+    - semantic similarity
+    - embedding similarity

@@ -1,0 +1,43 @@
+# The build context is the wheel's inputs and nothing else. Everything below
+# either cannot affect the image or would invalidate its cache on every commit.
+
+.git
+.github
+.venv
+.gigi
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+
+# Build and test output
+dist
+build
+*.egg-info
+.pytest_cache
+.ruff_cache
+htmlcov
+.coverage
+
+# Not in the wheel, and not needed to build it. `docs/` and `tests/` are the
+# repository's, not the package's -- read them on GitHub.
+docs
+tests
+scripts
+site
+*.pdf
+*.typ
+
+# Secrets never enter the build context. Nothing in the Dockerfile copies
+# these, but a future `COPY . .` would, and the daemon receives the context
+# either way.
+.env
+.env.*
+*.pem
+*.key
+
+# Local editor and OS noise
+.idea
+.vscode
+.DS_Store
+Thumbs.db

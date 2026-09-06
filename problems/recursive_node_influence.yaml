@@ -1,0 +1,32 @@
+id: recursive_node_influence
+name: Recursive node influence
+domain: graph
+
+question: >
+  Which nodes are important because other important nodes point at them?
+
+description: >
+  Rank nodes by influence that propagates along relationships, where receiving
+  a link from an influential node counts for more than receiving one from an
+  obscure node. The recursion is the point: importance is defined in terms of
+  itself, and the ranking is the fixed point.
+
+input_kinds: [graph]
+output_kinds: [node_score]
+
+related_problems:
+  - simple_node_importance
+  - brokerage_importance
+
+ai_context:
+  instructions: >
+    Choose this when the user cares about endorsement flowing through a
+    network -- influence, authority, reputation, recursive importance. If they
+    only mean "most connections", that is simple_node_importance and is
+    cheaper. If they mean "sits between other nodes", that is
+    brokerage_importance.
+  synonyms:
+    - recursive influence ranking
+    - link importance
+    - authority ranking
+    - who is influential in this network

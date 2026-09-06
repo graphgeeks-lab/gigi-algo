@@ -1,0 +1,238 @@
+name: release
+
+# Publish one version of gigi-algo, driven by a tag.
+#
+#   uv version --bump minor          # pyproject.toml is the single source of truth
+#   python scripts/sync-version.py   # CITATION.cff follows it
+#   <write the CHANGELOG section>
+#   git commit -am "release: 0.2.0" && git tag v0.2.0 && git push --tags
+#
+# Everything after that happens here, in order, and each job refuses to guess:
+#
+#   check     the tag, pyproject.toml, CITATION.cff and CHANGELOG.md all name the
+#             same version; the version is not already on PyPI; the suite passes
+#             on both backend matrices; the registry verifies
+#   build     sdist + wheel, once, uploaded as an artifact the later jobs reuse
+#   publish   to PyPI by trusted publishing (OIDC) -- no token lives anywhere
+#   release   a GitHub Release whose notes are the CHANGELOG section, created
+#             only after PyPI confirms the version is installable, attaching the
+#             exact files that were published
+#
+# The rule the whole file is built around: a Release page must describe
+# something a reader can install. So `release` runs after `publish`, reads
+# PyPI back, and stops if the version is not there. Notes for an unpublished
+# version are a promise nobody can keep.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  PACKAGE: gigi-algo
+
+jobs:
+  check:
+    name: Everything names the same version
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: The tag is the version, and every file agrees
+        id: version
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          V="${TAG#v}"
+          PY_V=$(uv version --short)
+          CFF_V=$(python -c "import re,pathlib; print(re.search(r'^version:\s*(\S+)', pathlib.Path('CITATION.cff').read_text(), re.M).group(1))")
+
+          echo "tag=$V pyproject=$PY_V citation=$CFF_V"
+          [ "$V" = "$PY_V" ]  || { echo "::error::Tag $TAG but pyproject.toml says $PY_V. Run 'uv version $V' and re-tag."; exit 1; }
+          [ "$V" = "$CFF_V" ] || { echo "::error::CITATION.cff says $CFF_V, not $V. Run 'python scripts/sync-version.py'."; exit 1; }
+
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if printf '%s' "$V" | grep -Eq '(a|b|rc)[0-9]+$'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: CHANGELOG.md describes this version
+        env:
+          WANT: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os, pathlib, re, sys
+          v = os.environ["WANT"]
+          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          m = re.search(rf"^## \[{re.escape(v)}\][^\n]*\n(.*?)(?=^## \[|\Z)", text, re.M | re.S)
+          if not m:
+              sys.exit(f"::error::CHANGELOG.md has no '## [{v}]' section. Move the Unreleased notes under it before tagging.")
+          body = m.group(1).strip()
+          if len(body) < 40:
+              sys.exit(f"::error::The '[{v}]' section is {len(body)} characters. That is not release notes.")
+          pathlib.Path("NOTES.md").write_text(body + "\n", encoding="utf-8")
+          print(f"{len(body)} characters of notes for {v}.")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notes
+          path: NOTES.md
+
+      - name: The version is not already on PyPI
+        env:
+          WANT: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          CODE=$(curl -sS -o /tmp/idx.json -w "%{http_code}" --retry 3 --retry-delay 2 \
+            "https://pypi.org/pypi/${PACKAGE}/json" || echo "000")
+          if [ "$CODE" = "404" ]; then
+            echo "${PACKAGE} has never been published. First release."
+            exit 0
+          fi
+          [ "$CODE" = "200" ] || { echo "::error::Could not read the PyPI index (HTTP $CODE). Refusing to guess."; exit 1; }
+          WANT="$WANT" python - <<'PY'
+          import json, os, sys
+          rels = json.load(open("/tmp/idx.json")).get("releases", {})
+          v = os.environ["WANT"]
+          if v in rels and rels[v]:
+              sys.exit(f"::error::{v} is already on PyPI. Versions are immutable there; bump and tag again.")
+          print(f"{v} is not on PyPI yet.")
+          PY
+
+      - name: Install and test (every backend)
+        run: |
+          uv sync --extra dev
+          uv run pytest -q
+          uv run gigi verify
+
+      - name: Test again with only NetworkX
+        run: |
+          uv venv .venv-minimal
+          UV_PROJECT_ENVIRONMENT=.venv-minimal uv sync --extra networkx
+          uv pip install --python .venv-minimal/bin/python pytest
+          UV_PROJECT_ENVIRONMENT=.venv-minimal uv run pytest -q
+
+  build:
+    name: Build sdist and wheel
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv build
+      - name: The wheel installs and reports the tagged version
+        env:
+          WANT: ${{ needs.check.outputs.version }}
+        run: |
+          set -euo pipefail
+          uv venv /tmp/smoke
+          uv pip install --python /tmp/smoke/bin/python dist/*.whl
+          GOT=$(/tmp/smoke/bin/python -c "import gigi; print(gigi.__version__)")
+          [ "$GOT" = "$WANT" ] || { echo "::error::Installed wheel reports $GOT, expected $WANT."; exit 1; }
+          # An installed package must be a complete registry, not just code:
+          # algorithms, fixtures, families and people all have to ship in the wheel.
+          cd /tmp
+          /tmp/smoke/bin/gigi list | grep -q pagerank || { echo "::error::The installed wheel lists no algorithms. The registry content is not being packaged."; exit 1; }
+          /tmp/smoke/bin/gigi people | grep -q dennis-irorere || { echo "::error::people.yaml did not ship in the wheel."; exit 1; }
+          uv pip install --python /tmp/smoke/bin/python networkx scipy
+          /tmp/smoke/bin/gigi verify pagerank
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Trusted publishing: PyPI trusts this repository + workflow + environment
+    # via OIDC. There is no API token to leak. One-time setup is described in
+    # docs/RELEASING.md. Requiring reviewers on the `pypi` environment is the
+    # place to add a human gate if one is wanted.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/gigi-algo/${{ needs.check.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: astral-sh/setup-uv@v5
+      - run: uv publish --trusted-publishing always dist/*
+
+  release:
+    name: Describe what was published
+    needs: [check, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: actions/download-artifact@v4
+        with:
+          name: notes
+
+      - name: PyPI confirms the version is installable
+        env:
+          WANT: ${{ needs.check.outputs.version }}
+        run: |
+          set -euo pipefail
+          # The index can lag the upload by a few seconds. Wait, briefly, then insist.
+          for attempt in 1 2 3 4 5 6; do
+            CODE=$(curl -sS -o /tmp/rel.json -w "%{http_code}" "https://pypi.org/pypi/${PACKAGE}/${WANT}/json" || echo "000")
+            [ "$CODE" = "200" ] && break
+            echo "attempt $attempt: HTTP $CODE, waiting"
+            sleep 10
+          done
+          [ "$CODE" = "200" ] || { echo "::error::${PACKAGE} ${WANT} is not visible on PyPI. No Release page for a version nobody can install."; exit 1; }
+          python -c "import json; d=json.load(open('/tmp/rel.json')); print(f\"{d['info']['name']} {d['info']['version']}: {len(d['urls'])} file(s) on PyPI\")"
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ needs.check.outputs.version }}
+          PRE: ${{ needs.check.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          TAG="v$V"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::A Release already exists for $TAG. Edit it by hand rather than overwrite it."
+            exit 1
+          fi
+          ARGS=(--title "gigi-algo $V" --notes-file NOTES.md --verify-tag)
+          [ "$PRE" = "true" ] && ARGS+=(--prerelease)
+          gh release create "$TAG" "${ARGS[@]}" dist/*
+
+          URL=$(gh release view "$TAG" --json url --jq .url)
+          {
+            echo "### gigi-algo $V"
+            echo ""
+            echo "- $URL"
+            echo "- https://pypi.org/project/${PACKAGE}/${V}/"
+            echo "- Notes from the \`[$V]\` section of CHANGELOG.md"
+            echo "- Artifacts are the files that were published, not a rebuild"
+          } >> "$GITHUB_STEP_SUMMARY"
