@@ -7,8 +7,6 @@ live in `sections.py`; the shell and primitives live in `html.py`.
 from __future__ import annotations
 
 from gigi import people, registry
-from gigi.backends import backend_versions
-from gigi.data import describe, list_datasets, load_dataset, profile_dataset
 from gigi.models import MethodSpec, VerificationReport
 from gigi.site.html import FROM_ALGORITHM, FROM_INDEX, Links, esc, status_pill, table
 from gigi.site.sections import (
@@ -26,8 +24,7 @@ def index_body(
     reports: dict[str, VerificationReport],
     links: Links = FROM_INDEX,
 ) -> str:
-    """The registry front page: algorithms, families, fixtures, backends, people."""
-    installed = backend_versions()
+    """The registry front page: methods, covered questions, and people."""
     rows = []
     for spec in specs:
         report = reports.get(spec.id)
@@ -43,48 +40,22 @@ def index_body(
             ]
         )
 
-    dataset_rows = []
-    for dataset_id in list_datasets():
-        data = load_dataset(dataset_id)
-        profile = profile_dataset(data)
-        features = [name for name, on in data.metadata.features.items() if on] or ["plain"]
-        dataset_rows.append(
-            [
-                f"<code>{esc(dataset_id)}</code>",
-                esc(profile.kind),
-                esc(describe(profile)),
-                ", ".join(f"<code>{esc(f)}</code>" for f in features),
-                esc(data.metadata.description.strip()),
-            ]
-        )
-
-    engine_rows = [
-        [f"<code>{esc(name)}</code>", esc(version or "unknown")]
-        for name, version in installed.items()
-    ]
-
     return f"""
-<h1>Gigi</h1>
-<p class="lede">The same named graph algorithm can return different answers on
-different backends, because defaults and semantics differ. Gigi writes those
-differences down, then runs them to prove they are real.</p>
+<h1>Gigi method registry</h1>
+<p class="lede">A live record of what each method means, who contributed to it,
+and what independent implementations actually do. This is evidence generated
+from the registry; the handbook explains how to use and contribute to it.</p>
 
-<h2>Algorithms</h2>
-{table(["algorithm", "family", "maturity", "backends", "divergences", "verification"], rows)}
+<h2>Methods</h2>
+{table(["method", "family", "maturity", "backends", "divergences", "verification"], rows)}
 
-<h2>Families</h2>
-<p class="lede">A family is a question, not a label. An algorithm belongs to one
-when it answers that question -- which is what makes the taxonomy useful for
-choosing within it rather than merely filing things.</p>
+<p class="lede">Open a method to see its purpose, mathematics, origin,
+parameters, backend behavior, and the verification evidence behind this row.</p>
+
+<h2>Questions covered</h2>
+<p class="lede">Gigi groups methods by the question they answer, so the taxonomy
+helps with choosing rather than merely filing.</p>
 {families_table(links)}
-
-<h2>Adversarial fixtures</h2>
-<p class="lede">Small, deterministic graphs chosen because each one puts pressure
-on a specific semantic decision.</p>
-{table(["dataset", "kind", "shape", "features", "why it exists"], dataset_rows)}
-
-<h2>Backends in this build</h2>
-{table(["backend", "version"], engine_rows)}
 
 <h2>People</h2>
 <p class="lede">Who did the work here. Separate from who created the algorithms,
@@ -98,6 +69,8 @@ def families_table(links: Links) -> str:
     rows = []
     for family in registry.list_families():
         members = registry.methods_in_family(family.id)
+        if not members:
+            continue
         parent = registry.load_family(family.parent).name if family.parent else ""
         rows.append(
             [
@@ -107,8 +80,7 @@ def families_table(links: Links) -> str:
                 ", ".join(
                     f'<a href="{esc(links.to_algorithm(a))}"><code>{esc(a)}</code></a>'
                     for a in members
-                )
-                or '<span class="pill">none yet</span>',
+                ),
             ]
         )
     return table(["family", "the question it answers", "within", "algorithms"], rows)
