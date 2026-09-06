@@ -2,7 +2,7 @@
 
 Gigi is a registry of what analytical methods *mean*, and a harness that checks those claims against the libraries that implement them. This document is the shape of the thing: what the pieces are, how a question travels through them, and why the boundaries sit where they do.
 
-If you want to read the code, [CODEBASE.md](CODEBASE.md) has a reading order. If you want to add a method, [CONTRIBUTING.md](../CONTRIBUTING.md) is the one to open. This is the map you look at before either.
+If you want to read the code, [CODEBASE.md](CODEBASE.md) has a reading order. If you want to add a method, [CONTRIBUTING.md](contributing.md) is the one to open. This is the map you look at before either.
 
 ## The one-sentence version
 

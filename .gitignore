@@ -6,6 +6,7 @@ __pycache__/
 /build/
 .gigi/
 /site/
+/docs/_build/
 .pytest_cache/
 gigi/_content/
 .env

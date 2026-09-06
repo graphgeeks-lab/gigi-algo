@@ -1,6 +1,6 @@
 # Reading this codebase
 
-Most of Gigi is content, not code. `methods/`, `datasets/`, `problems/`, `families/`, `domains/`, `semantics/` and `people/` are the project; `gigi/` is the machinery that reads them and runs them. If you are here to contribute a method, you do not need this file — read [CONTRIBUTING.md](../CONTRIBUTING.md) instead.
+Most of Gigi is content, not code. `methods/`, `datasets/`, `problems/`, `families/`, `domains/`, `semantics/` and `people/` are the project; `gigi/` is the machinery that reads them and runs them. If you are here to contribute a method, you do not need this file — read [CONTRIBUTING.md](contributing.md) instead.
 
 For the shape of the system before the code — the three layers, the verify loop, how `gigi ask` decides — read [ARCHITECTURE.md](ARCHITECTURE.md) first.
 
@@ -89,4 +89,4 @@ Docstrings and comments do not count toward any line total. Prose is not what ma
 - **Errors name the file.** Validation failures are re-raised with the path attached; the person seeing them is usually editing that file.
 - **No abstraction with one implementation.** Adapters are a dict in one file. There is no plugin system, and there should not be until there is a reason.
 - **No Pydantic model** unless it crosses a module boundary or is serialised.
-- **Comments explain *why*.** The what is in the code; the why is usually a decision, and decisions belong in [docs/adr/](adr/).
+- **Comments explain *why*.** The what is in the code; the why is usually a decision, and decisions belong in the [architecture decision records](adr/0001-arrow-in-memory-csv-on-disk.md).

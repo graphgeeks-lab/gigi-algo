@@ -95,7 +95,7 @@ Consequently:
 
 ### Adding one
 
-Identical to any other algorithm ([CONTRIBUTING.md](../CONTRIBUTING.md)) except that you write `maturity: frontier` and stop as soon as it runs. Then use `gigi review` to see what `emerging` would take.
+Identical to any other algorithm ([CONTRIBUTING.md](contributing.md)) except that you write `maturity: frontier` and stop as soon as it runs. Then use `gigi review` to see what `emerging` would take.
 
 ---
 

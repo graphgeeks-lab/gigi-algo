@@ -5,7 +5,13 @@ description = "An executable registry of graph algorithm semantics: run the same
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
-keywords = ["graph", "algorithms", "networkx", "igraph", "rustworkx", "verification", "reproducibility"]
+authors = [
+    { name = "Dennis Irorere", email = "denironyx@gmail.com" },
+]
+maintainers = [
+    { name = "Dennis Irorere", email = "denironyx@gmail.com" },
+]
+keywords = ["graph", "algorithms", "networkx", "igraph", "rustworkx", "verification", "reproducibility", "semantic layer"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -34,8 +40,8 @@ rustworkx = ["rustworkx>=0.14"]
 # Vector backends. Not graph libraries -- see docs/ONTOLOGY.md.
 scipy = ["scipy>=1.10"]
 sklearn = ["scikit-learn>=1.3"]
-# PDF export of algorithm entries. The .typ source never needs this.
-docs = ["typst>=0.13"]
+# PDF export and the Sphinx handbook. The .typ source never needs these.
+docs = ["typst>=0.13", "sphinx>=8,<9", "myst-parser>=4,<5", "sphinxcontrib-mermaid>=0.9"]
 all = [
     "networkx>=3.0",
     "scipy>=1.10",
@@ -55,6 +61,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/graphgeeks-lab/gigi-algo"
+Documentation = "https://gigi-algo.readthedocs.io/"
 Changelog = "https://github.com/graphgeeks-lab/gigi-algo/blob/main/CHANGELOG.md"
 Issues = "https://github.com/graphgeeks-lab/gigi-algo/issues"
 
